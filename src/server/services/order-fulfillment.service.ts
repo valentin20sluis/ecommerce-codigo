@@ -78,6 +78,54 @@ export async function fulfillOrder(session: Stripe.Checkout.Session): Promise<vo
   });
 }
 
+/** Distingue el webhook del backfill de 011 T9 sin duplicar la transacción. */
+export type ExpireSource = "webhook" | "backfill";
+
+/**
+ * `checkout.session.expired`: la sesión caducó sin pagarse, así que la orden
+ * queda `expired` —"Cancelado" de cara al cliente (011 D1)— y se audita en la
+ * misma transacción. No restituye stock: `expired` nunca lo descontó.
+ *
+ * Devuelve `true` solo si esta llamada fue la que cambió el estado; el guard de
+ * `markExpired` hace que una reentrega o una segunda pasada del backfill
+ * devuelvan `false` sin auditar de nuevo.
+ */
+export async function expireOrder(
+  session: Stripe.Checkout.Session,
+  source: ExpireSource = "webhook",
+): Promise<boolean> {
+  return dbTx.transaction(async (tx) => {
+    const order = await findOrderForSession(tx, session);
+
+    if (!order) {
+      console.warn(`[${source}:stripe] sesión expirada ${session.id} sin orden asociada`);
+      return false;
+    }
+
+    // Una orden ya cobrada o fallida no vuelve atrás por un evento de expiración.
+    if (order.status !== "pending_payment") return false;
+
+    const expired = await orderRepository.markExpired(tx, order.id);
+    if (!expired) return false;
+
+    await logAudit(tx, {
+      actorId: order.userId,
+      action: "order.expired",
+      entityType: ENTITY_TYPE,
+      entityId: order.id,
+      changes: { before: { status: order.status }, after: { status: expired.status } },
+      metadata: {
+        stripeCheckoutSessionId: session.id,
+        reason: "checkout_session_expired",
+        ...(source === "backfill" ? { source } : {}),
+      },
+      severity: "warning",
+    });
+
+    return true;
+  });
+}
+
 /** `checkout.session.async_payment_failed`: sin stock descontado, severidad warning. */
 export async function markOrderFailed(session: Stripe.Checkout.Session): Promise<void> {
   await dbTx.transaction(async (tx) => {

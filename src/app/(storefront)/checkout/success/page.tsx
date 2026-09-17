@@ -52,6 +52,13 @@ const STATUS_VIEW: Record<
     badge: "Cancelado",
     variant: "destructive",
   },
+  expired: {
+    title: "El pedido fue cancelado",
+    description:
+      "La sesión de pago expiró y no se realizó ningún cobro. Puedes armar tu carrito de nuevo cuando quieras.",
+    badge: "Cancelado",
+    variant: "destructive",
+  },
 };
 
 function StatusIcon({ status }: { status: OrderStatus }) {

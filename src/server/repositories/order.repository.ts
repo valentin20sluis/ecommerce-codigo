@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, lte, ne, type SQL } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, lte, ne, type SQL } from "drizzle-orm";
 
 import { db } from "@/server/db";
 import type { Executor, ReadExecutor } from "@/server/db/pool";
@@ -178,6 +178,38 @@ export async function markFailed(executor: Executor, orderId: string): Promise<O
     .returning();
 
   return order ?? null;
+}
+
+/**
+ * `checkout.session.expired`: mismo guard que `markFailed`, acotado al estado de
+ * origen. Una reentrega del evento —o el backfill corriendo dos veces— no
+ * devuelve fila, así que el llamador corta sin auditar de nuevo (011 AC2/AC3).
+ */
+export async function markExpired(executor: Executor, orderId: string): Promise<Order | null> {
+  const [order] = await executor
+    .update(orders)
+    .set({ status: "expired", updatedAt: new Date() })
+    .where(and(eq(orders.id, orderId), eq(orders.status, "pending_payment")))
+    .returning();
+
+  return order ?? null;
+}
+
+/**
+ * Candidatas del backfill de sesiones expiradas: pendientes que sí llegaron a
+ * tener sesión en Stripe. Las de `stripe_checkout_session_id IS NULL` quedan
+ * fuera del alcance (011) porque no hay nada que consultarle a Stripe.
+ */
+export async function listPendingWithSession(
+  limit: number,
+  executor: ReadExecutor = db,
+): Promise<Order[]> {
+  return executor
+    .select()
+    .from(orders)
+    .where(and(eq(orders.status, "pending_payment"), isNotNull(orders.stripeCheckoutSessionId)))
+    .orderBy(desc(orders.createdAt))
+    .limit(limit);
 }
 
 /** Compensación de D5: solo aplica a la orden recién creada que Stripe rechazó. */

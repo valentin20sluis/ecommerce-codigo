@@ -16,8 +16,18 @@ import { users } from "./user";
  * Estados **de cobro** (008 D3). Los de fulfillment (`shipped`, `delivered`) los
  * añadirá el spec de gestión de pedidos del admin ampliando el enum, sin
  * renombrar estos.
+ *
+ * `canceled` y `expired` no son sinónimos (011 D1): `canceled` es la
+ * compensación de una sesión que Stripe rechazó crear y se oculta del historial;
+ * `expired` es una sesión real que caducó sin pagarse y sí se muestra.
  */
-export const ORDER_STATUSES = ["pending_payment", "paid", "payment_failed", "canceled"] as const;
+export const ORDER_STATUSES = [
+  "pending_payment",
+  "paid",
+  "payment_failed",
+  "canceled",
+  "expired",
+] as const;
 
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 

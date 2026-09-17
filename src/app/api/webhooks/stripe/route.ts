@@ -34,6 +34,16 @@ async function dispatch(event: Stripe.Event): Promise<void> {
     case "checkout.session.async_payment_failed":
       await fulfillmentService.markOrderFailed(event.data.object);
       return;
+    case "checkout.session.expired": {
+      const session = event.data.object;
+
+      // Una sesión de `setup` (010) que caduca no tiene orden que cancelar: se
+      // ignora igual que en el branch de completed.
+      if (session.mode !== "payment") return;
+
+      await fulfillmentService.expireOrder(session);
+      return;
+    }
     default:
       // Stripe envía eventos a los que no estamos suscritos: 200 y seguir. Un
       // 500 aquí lo haría reintentar en bucle.

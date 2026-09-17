@@ -16,6 +16,7 @@
     "db:seed": "tsx --env-file-if-exists=.env.local src/server/db/seed.ts",
     "db:seed:catalog": "tsx --env-file-if-exists=.env.local src/server/db/seed-catalog.ts",
     "db:sync-users": "tsx --env-file-if-exists=.env.local src/server/db/sync-clerk-users.ts",
+    "db:reconcile-expired": "tsx --env-file-if-exists=.env.local src/server/db/reconcile-expired-orders.ts",
     "webhooks:token": "npx -y clerk@latest webhooks token",
     "webhooks:listen": "npx -y clerk@latest webhooks listen --forward-to http://localhost:3000/api/webhooks/clerk",
     "stripe:listen": "stripe listen --forward-to localhost:3000/api/webhooks/stripe"
