@@ -13,9 +13,14 @@ import {
 import { users } from "./user";
 
 /**
- * Estados **de cobro** (008 D3). Los de fulfillment (`shipped`, `delivered`) los
- * añadirá el spec de gestión de pedidos del admin ampliando el enum, sin
- * renombrar estos.
+ * Estados de cobro (008 D3) y de fulfillment (012). `processing`, `shipped` y
+ * `delivered` se añadieron **después** de `paid` sin renombrar ni reordenar los
+ * existentes, porque `ALTER TYPE … ADD VALUE` es additivo y las órdenes
+ * históricas se quedan en `paid` sin backfill.
+ *
+ * El avance de fulfillment (`paid → processing → shipped → delivered`) lo
+ * gobierna `ORDER_FULFILLMENT_NEXT` en `src/modules/orders/constants.ts`: es un
+ * solo paso, sin retroceso y sin salto.
  *
  * `canceled` y `expired` no son sinónimos (011 D1): `canceled` es la
  * compensación de una sesión que Stripe rechazó crear y se oculta del historial;
@@ -24,6 +29,9 @@ import { users } from "./user";
 export const ORDER_STATUSES = [
   "pending_payment",
   "paid",
+  "processing",
+  "shipped",
+  "delivered",
   "payment_failed",
   "canceled",
   "expired",

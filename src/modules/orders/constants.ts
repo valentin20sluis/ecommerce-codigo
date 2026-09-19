@@ -16,8 +16,36 @@ export type OrderStatusView = {
  */
 export const ORDER_STATUS_VIEW: Record<OrderStatus, OrderStatusView> = {
   paid: { label: "Pagado", variant: "default" },
+  processing: { label: "En preparación", variant: "secondary" },
+  shipped: { label: "Enviado", variant: "secondary" },
+  delivered: { label: "Entregado", variant: "default" },
   pending_payment: { label: "Pendiente", variant: "secondary" },
   payment_failed: { label: "Pago rechazado", variant: "destructive" },
   canceled: { label: "Cancelado", variant: "destructive" },
   expired: { label: "Cancelado", variant: "destructive" },
 };
+
+/**
+ * Única fuente de la transición de fulfillment (012 D2): la consume el service
+ * para validar el `PATCH` y la tabla del admin para ofrecer el único paso
+ * posible. Un estado ausente del mapa no admite avance —terminal (`delivered`)
+ * o fuera del flujo (`pending_payment`, `payment_failed`, `canceled`,
+ * `expired`)—, así que no hay retroceso ni salto de estados.
+ */
+export const ORDER_FULFILLMENT_NEXT: Partial<Record<OrderStatus, OrderStatus>> = {
+  paid: "processing",
+  processing: "shipped",
+  shipped: "delivered",
+};
+
+/**
+ * Cobro confirmado: la orden ya es una venta y todo el fulfillment (012) la
+ * conserva. Única definición de "venta" del proyecto (013 D1): la consumen el
+ * ícono de éxito de `checkout/success` y las agregaciones del dashboard.
+ */
+export const SETTLED_STATUSES: readonly OrderStatus[] = [
+  "paid",
+  "processing",
+  "shipped",
+  "delivered",
+];

@@ -57,6 +57,13 @@
       "when": 1789612708217,
       "tag": "0007_cynical_lady_vermin",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789780153979,
+      "tag": "0008_dapper_hellion",
+      "breakpoints": true
     }
   ]
 }

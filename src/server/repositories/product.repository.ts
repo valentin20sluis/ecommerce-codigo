@@ -1,4 +1,18 @@
-import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, lt, or, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  isNotNull,
+  lt,
+  lte,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 
 import { db } from "@/server/db";
 import type { Executor, ReadExecutor } from "@/server/db/pool";
@@ -212,6 +226,31 @@ export async function update(
 
 export async function remove(executor: Executor, id: string): Promise<void> {
   await executor.delete(products).where(eq(products.id, id));
+}
+
+export type LowStockProduct = Pick<Product, "id" | "name" | "slug" | "stock">;
+
+/**
+ * Alerta de inventario del dashboard (013 D7): solo activos, porque un producto
+ * dado de baja no se vende y no es alerta. Orden por stock asc para que lo más
+ * urgente quede arriba; el límite lo fija el llamador.
+ */
+export async function listLowStock(
+  threshold: number,
+  limit: number,
+  executor: ReadExecutor = db,
+): Promise<LowStockProduct[]> {
+  return executor
+    .select({
+      id: products.id,
+      name: products.name,
+      slug: products.slug,
+      stock: products.stock,
+    })
+    .from(products)
+    .where(and(eq(products.isActive, true), lte(products.stock, threshold)))
+    .orderBy(asc(products.stock))
+    .limit(limit);
 }
 
 export type StockDecrement = { productId: string; qty: number };

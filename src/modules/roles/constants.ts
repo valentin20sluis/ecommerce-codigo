@@ -53,11 +53,14 @@ export const SYSTEM_ROLES: readonly SystemRoleDefinition[] = [
   {
     slug: "manager",
     name: "Gerente",
-    description: "Gestiona catálogo y consulta accesos y bitácora, sin tocar la matriz de permisos.",
+    description:
+      "Gestiona catálogo y pedidos y consulta accesos y bitácora, sin tocar la matriz de permisos.",
     permissions: [
       PERMISSIONS.ADMIN_ACCESS,
       PERMISSIONS.DASHBOARD_READ,
       ...CATALOG_PERMISSIONS,
+      PERMISSIONS.ORDERS_READ,
+      PERMISSIONS.ORDERS_UPDATE_STATUS,
       PERMISSIONS.USERS_READ,
       PERMISSIONS.AUDIT_READ,
     ],

@@ -11,6 +11,7 @@ import { requireAuth } from "@/lib/auth";
 import { formatPriceFromCents } from "@/lib/utils";
 import { ClearCartOnSuccess } from "@/modules/checkout/components/clear-cart-on-success";
 import { toOrderSummaryDto } from "@/modules/checkout/types";
+import { SETTLED_STATUSES } from "@/modules/orders/constants";
 import type { OrderStatus } from "@/server/db/schema";
 import * as orderRepository from "@/server/repositories/order.repository";
 
@@ -40,6 +41,24 @@ const STATUS_VIEW: Record<
     badge: "Pendiente",
     variant: "secondary",
   },
+  processing: {
+    title: "¡Gracias por tu compra!",
+    description: "Tu pago fue confirmado y ya estamos preparando tu pedido.",
+    badge: "En preparación",
+    variant: "secondary",
+  },
+  shipped: {
+    title: "Tu pedido va en camino",
+    description: "Tu pedido ya salió de nuestro almacén.",
+    badge: "Enviado",
+    variant: "secondary",
+  },
+  delivered: {
+    title: "Tu pedido fue entregado",
+    description: "Gracias por comprar con nosotros.",
+    badge: "Entregado",
+    variant: "default",
+  },
   payment_failed: {
     title: "El pago no se completó",
     description: "Tu pedido no pudo cobrarse. Puedes volver al checkout e intentarlo de nuevo.",
@@ -62,7 +81,7 @@ const STATUS_VIEW: Record<
 };
 
 function StatusIcon({ status }: { status: OrderStatus }) {
-  if (status === "paid") return <CheckCircle2Icon className="size-10 text-brand" />;
+  if (SETTLED_STATUSES.includes(status)) return <CheckCircle2Icon className="size-10 text-brand" />;
   if (status === "pending_payment") return <ClockIcon className="size-10 text-muted-foreground" />;
   return <XCircleIcon className="size-10 text-destructive" />;
 }
