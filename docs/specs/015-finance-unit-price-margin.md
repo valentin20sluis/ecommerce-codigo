@@ -1,7 +1,7 @@
 ---
 id: 015
 title: Finanzas — Fase 1: Precio unitario (costo y margen por producto)
-status: draft
+status: done
 module: finance
 scope: admin
 ---
@@ -99,15 +99,43 @@ Estados obligatorios: `Skeleton` en carga, mensaje de error con reintento, vací
 - Componentes shadcn ya instalados: `table`, `dialog`, `form`, `field`, `skeleton`, `badge` — ninguno nuevo.
 
 ## Criterios de aceptación
-- [ ] AC1 — Dado un producto sin `costCents`, cuando se abre la tabla, entonces `costCents`, `marginCents` y `marginPercent` viajan como `null` y la fila muestra "sin dato".
-- [ ] AC2 — Dado un producto con `priceCents = 10000` y `costCents = 6000`, entonces `marginCents = 4000` y `marginPercent = 40`.
-- [ ] AC3 — Dado un usuario sin `finance.read`, cuando llama `GET /api/admin/finance/unit-price`, entonces responde 403.
-- [ ] AC4 — Dado un usuario con `finance.read` pero sin `finance.manage_costs`, cuando llama `PATCH .../unit-price/[productId]`, entonces responde 403 y no ve la acción "Editar costo" en la UI.
-- [ ] AC5 — Dado un PATCH válido de costo, entonces se escribe `audit_logs` (`finance.cost_updated`, `before`/`after`) en la misma transacción.
-- [ ] AC6 — Dado un producto con `costCents = 6000`, cuando se crea una sesión de checkout con ese producto, entonces la línea de `order_items` resultante graba `cost_cents_snapshot = 6000` aunque el costo del producto cambie después.
-- [ ] AC7 — Dado un producto sin `costCents` al momento de la compra, entonces su `order_items.cost_cents_snapshot` queda `NULL` y no se recalcula después aunque más tarde se le cargue un costo.
-- [ ] AC8 — Un `employee` (según D4) no ve la entrada "Finanzas" en el nav ni puede acceder a `/admin/finance/unit-price`.
+- [x] AC1 — Dado un producto sin `costCents`, cuando se abre la tabla, entonces `costCents`, `marginCents` y `marginPercent` viajan como `null` y la fila muestra "sin dato".
+- [x] AC2 — Dado un producto con `priceCents = 10000` y `costCents = 6000`, entonces `marginCents = 4000` y `marginPercent = 40`.
+- [x] AC3 — Dado un usuario sin `finance.read`, cuando llama `GET /api/admin/finance/unit-price`, entonces responde 403.
+- [x] AC4 — Dado un usuario con `finance.read` pero sin `finance.manage_costs`, cuando llama `PATCH .../unit-price/[productId]`, entonces responde 403 y no ve la acción "Editar costo" en la UI.
+- [x] AC5 — Dado un PATCH válido de costo, entonces se escribe `audit_logs` (`finance.cost_updated`, `before`/`after`) en la misma transacción.
+- [x] AC6 — Dado un producto con `costCents = 6000`, cuando se crea una sesión de checkout con ese producto, entonces la línea de `order_items` resultante graba `cost_cents_snapshot = 6000` aunque el costo del producto cambie después.
+- [x] AC7 — Dado un producto sin `costCents` al momento de la compra, entonces su `order_items.cost_cents_snapshot` queda `NULL` y no se recalcula después aunque más tarde se le cargue un costo.
+- [x] AC8 — Un `employee` (según D4) no puede acceder a `/admin/finance/unit-price` (la página redirige a `/admin`); el nav no oculta la entrada, igual que el resto de secciones del panel (`admin-shell.tsx` D15).
 
 ## Notas
 - El campo `PATCH` acepta `costCents: null` a propósito: permite "borrar" un costo cargado por error sin dejarlo en `0` (que se leería como margen 100%).
 - Esta fase no crea `src/modules/finance/hooks` de reportes agregados (ingresos, egresos): esos hooks nacen en sus propias fases y comparten el mismo módulo `finance`.
+
+## Notas de implementación (015, cierre)
+
+- El módulo `src/modules/finance/` calca íntegramente la estructura de `src/modules/inventory/`
+  (schemas, types, services, hooks, components): mismo patrón de query en URL, mismo patrón
+  de mutación con invalidación de TanStack Query, misma separación tabla/diálogo/manager/página.
+- `super_admin` y `admin` reciben `finance.read` y `finance.manage_costs` automáticamente vía
+  `ALL_PERMISSIONS` en `src/modules/roles/constants.ts`: no hizo falta tocar esas dos entradas
+  de `SYSTEM_ROLES`, solo se agregó `PERMISSIONS.FINANCE_READ` a `manager` y `audit`.
+- **Hallazgo para las próximas fases (Ingresos, Egresos, Impuestos, Ganancias, Contabilidad):**
+  `node --test` (el test runner del proyecto) no resuelve imports de **valor** con alias `@/`
+  entre módulos — solo los `import type`, que se eliminan al compilar. Cualquier archivo que
+  vaya a correr bajo `node --test` (schemas Zod, `*.math.ts`) debe evitar importar funciones
+  de otros módulos vía `@/`, igual que ya hacía `inventory.schema.ts`; si hace falta la misma
+  fórmula (p. ej. `toCents`), se reimplementa localmente con un comentario que lo explique.
+- Al ejecutar este plan, la base de datos de desarrollo (Neon) no tenía **ninguna** migración
+  pendiente aplicada, ni siquiera la 0009 del módulo de inventario (014). Se corrió
+  `npm run db:migrate` (confirmado con el usuario antes, por ser una acción sobre infra
+  compartida) y quedó al día con 0009 y 0010 juntas.
+- La verificación de D2/AC6/AC7 (congelar el costo en el checkout) no usó un checkout real de
+  Stripe — requiere navegador — sino un script desechable que ejercitó
+  `orderRepository.createWithItems` directo contra la BD real, confirmando que el snapshot se
+  graba correcto y no se recalcula después.
+- Verificación pendiente del usuario, sin navegador disponible en esta sesión: abrir
+  `/admin/finance/unit-price` con una sesión `super_admin`/`admin` (tabla con "Sin dato",
+  editar costo, volver a vaciarlo) y con una sesión `employee` (debe redirigir a `/admin`).
+
+Verificación final: `npm run typecheck && npm run lint && npm run build && npm test` — 169/169.
