@@ -39,6 +39,14 @@ export const ORDER_FULFILLMENT_NEXT: Partial<Record<OrderStatus, OrderStatus>> =
 };
 
 /**
+ * Estados desde los que un admin puede cancelar un pedido ya cobrado (014 D6).
+ * `delivered` queda fuera —ya está en manos del cliente— y los que nunca
+ * descontaron stock (`pending_payment`, `payment_failed`, `expired`) tampoco
+ * entran: cancelar repone stock, así que solo aplica a lo que sí lo descontó.
+ */
+export const CANCELABLE_STATUSES: readonly OrderStatus[] = ["paid", "processing", "shipped"];
+
+/**
  * Cobro confirmado: la orden ya es una venta y todo el fulfillment (012) la
  * conserva. Única definición de "venta" del proyecto (013 D1): la consumen el
  * ícono de éxito de `checkout/success` y las agregaciones del dashboard.

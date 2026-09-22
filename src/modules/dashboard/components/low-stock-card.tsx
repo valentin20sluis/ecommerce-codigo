@@ -3,7 +3,6 @@ import { TriangleAlertIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { LOW_STOCK_THRESHOLD } from "@/modules/dashboard/constants";
 import type { LowStockProduct } from "@/modules/dashboard/types/metrics";
 
 type LowStockCardProps = {
@@ -19,7 +18,7 @@ export function LowStockCard({ products }: LowStockCardProps) {
           Stock bajo
         </CardTitle>
         <CardDescription>
-          Productos activos con {LOW_STOCK_THRESHOLD} unidades o menos
+          Productos activos en o por debajo de su umbral de stock bajo
         </CardDescription>
       </CardHeader>
 
@@ -30,13 +29,13 @@ export function LowStockCard({ products }: LowStockCardProps) {
               <li key={product.id} className="flex items-center justify-between gap-3 py-2">
                 {/* `q` es el filtro de texto ya existente del listado (D8). */}
                 <Link
-                  href={`/admin/products?q=${encodeURIComponent(product.name)}`}
+                  href={`/admin/inventory?q=${encodeURIComponent(product.name)}`}
                   className="truncate text-sm underline-offset-4 hover:underline"
                 >
                   {product.name}
                 </Link>
-                <Badge variant={product.stock === 0 ? "destructive" : "secondary"}>
-                  {product.stock} u.
+                <Badge variant={product.stock <= 0 ? "destructive" : "secondary"}>
+                  {product.stock} / {product.lowStockThreshold} u.
                 </Badge>
               </li>
             ))}

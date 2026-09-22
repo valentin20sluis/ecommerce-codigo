@@ -6,12 +6,14 @@ import { inArray, sql } from "drizzle-orm";
 
 import { closePool, dbTx, type Executor } from "@/server/db/pool";
 import { categories, products } from "@/server/db/schema";
+import { recordInitialMovement } from "@/server/services/inventory.service";
 
 /**
  * Catálogo de demostración para la landing (005 D7, T12): reutiliza las 8 fotos
  * reales aprobadas en la fase de diseño, ya copiadas a `public/products/`. Script
  * aparte de `seed.ts` (RBAC/usuarios) e idempotente por `slug`: correrlo dos veces
- * no duplica filas, solo actualiza los campos declarados aquí.
+ * no duplica filas, solo actualiza los campos declarados aquí. El `stock` queda
+ * fuera de esa actualización a propósito: desde 014 solo lo mueve el kardex.
  */
 const CATEGORIES = [
   { slug: "laptops", name: "Laptops", description: "Portátiles para trabajo y creación." },
@@ -427,6 +429,11 @@ async function seedCategories(tx: Executor): Promise<Map<CategorySlug, string>> 
   return new Map(rows.map((row) => [row.slug as CategorySlug, row.id]));
 }
 
+/**
+ * Siembra el catálogo sin romper el kardex de 014: el stock solo nace con su
+ * movimiento `initial`, y el de un producto que ya existe no se toca —el UPSERT
+ * lo reescribiría sin dejar rastro y descuadraría `sum(qty_delta)` (AC6)—.
+ */
 async function seedProducts(tx: Executor, categoryIds: Map<CategorySlug, string>): Promise<number> {
   const values = PRODUCTS.map((product) => {
     const categoryId = categoryIds.get(product.categorySlug);
@@ -447,7 +454,21 @@ async function seedProducts(tx: Executor, categoryIds: Map<CategorySlug, string>
     };
   });
 
-  await tx
+  // Slugs ya presentes antes del UPSERT: su stock vive en el kardex y este
+  // script no lo mueve, así que tampoco les emite un `initial` duplicado.
+  const existing = await tx
+    .select({ slug: products.slug })
+    .from(products)
+    .where(
+      inArray(
+        products.slug,
+        values.map((value) => value.slug),
+      ),
+    );
+
+  const alreadySeeded = new Set(existing.map((row) => row.slug));
+
+  const rows = await tx
     .insert(products)
     .values(values)
     .onConflictDoUpdate({
@@ -458,12 +479,20 @@ async function seedProducts(tx: Executor, categoryIds: Map<CategorySlug, string>
         categoryId: sql`excluded.category_id`,
         priceCents: sql`excluded.price_cents`,
         compareAtPriceCents: sql`excluded.compare_at_price_cents`,
-        stock: sql`excluded.stock`,
         isActive: true,
         imageUrl: sql`excluded.image_url`,
         updatedAt: new Date(),
       },
-    });
+    })
+    .returning({ id: products.id, slug: products.slug, stock: products.stock });
+
+  for (const row of rows) {
+    if (alreadySeeded.has(row.slug)) continue;
+
+    // Mismo camino que el alta de producto del panel: con stock 0 no hay
+    // movimiento, porque el CHECK de la tabla exige `qty_delta <> 0`.
+    await recordInitialMovement(tx, row.id, row.stock, null);
+  }
 
   return values.length;
 }

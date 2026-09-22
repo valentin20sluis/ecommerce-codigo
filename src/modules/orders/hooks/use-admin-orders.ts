@@ -4,6 +4,8 @@ import { useCallback, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { dashboardMetricKeys } from "@/modules/dashboard/hooks/use-dashboard-metrics";
+import { inventoryKeys } from "@/modules/inventory/hooks/use-inventory";
 import {
   adminOrdersQuerySchema,
   type AdminOrdersQuery,
@@ -72,13 +74,24 @@ export function useAdminOrderFilters() {
   return { query, setFilters, setPage, reset };
 }
 
-/** Invalida toda la key: el avance de estado puede sacar la fila del filtro activo. */
-export function useAdvanceOrderStatus() {
+/**
+ * Avance de fulfillment y cancelación comparten el mismo `PATCH`. Invalida toda
+ * la key —el cambio de estado puede sacar la fila del filtro activo—, el
+ * inventario (cancelar repone stock con movimientos `return`, 014 T23) y las
+ * métricas del dashboard, que cuentan solo los estados vendidos (013).
+ */
+export function useUpdateOrderStatus() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateOrderStatusInput }) =>
       updateOrderStatus(id, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: adminOrderKeys.all }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: adminOrderKeys.all }),
+        queryClient.invalidateQueries({ queryKey: inventoryKeys.all }),
+        queryClient.invalidateQueries({ queryKey: dashboardMetricKeys.all }),
+      ]);
+    },
   });
 }

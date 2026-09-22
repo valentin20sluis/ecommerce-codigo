@@ -4,7 +4,7 @@ import { logAudit } from "@/lib/audit";
 import { dbTx, type Executor } from "@/server/db/pool";
 import * as orderRepository from "@/server/repositories/order.repository";
 import type { OrderWithItems } from "@/server/repositories/order.repository";
-import * as productRepository from "@/server/repositories/product.repository";
+import { recordSaleMovements } from "@/server/services/inventory.service";
 
 const ENTITY_TYPE = "order";
 
@@ -55,16 +55,24 @@ export async function fulfillOrder(session: Stripe.Checkout.Session): Promise<vo
       return;
     }
 
-    if (order.status === "paid") return;
+    // Solo una orden aún por cobrar entra al fulfillment: una reentrega tardía
+    // del evento no debe devolver a `paid` un pedido que ya avanzó
+    // (`processing|shipped|delivered`) ni resucitar uno `canceled`, cuyo
+    // `return` ya está en el kardex (014).
+    if (order.status !== "pending_payment" && order.status !== "payment_failed") return;
 
     const paid = await orderRepository.markPaid(tx, order.id, resolvePaymentIntentId(session));
     // Otra entrega del mismo evento ganó la carrera y ya la marcó: no repetir.
     if (!paid) return;
 
-    await productRepository.decrementStock(
-      tx,
-      order.items.map((item) => ({ productId: item.productId, qty: item.qty })),
-    );
+    // Cada línea deja su movimiento `sale` en el kardex, en esta misma
+    // transacción y con doble candado de idempotencia: el `markPaid` condicional
+    // y el índice único por referencia de orden (AC4).
+    await recordSaleMovements(tx, {
+      orderId: order.id,
+      lines: order.items.map((item) => ({ productId: item.productId, qty: item.qty })),
+      actorId: null,
+    });
 
     await logAudit(tx, {
       actorId: order.userId,

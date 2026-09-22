@@ -8,6 +8,7 @@ import { dbTx, type Executor } from "@/server/db/pool";
 import type { Product, User } from "@/server/db/schema";
 import * as categoryRepository from "@/server/repositories/category.repository";
 import * as productRepository from "@/server/repositories/product.repository";
+import { recordInitialMovement } from "@/server/services/inventory.service";
 
 const PRODUCT_ENTITY = "product";
 
@@ -90,6 +91,7 @@ function auditableFields(product: Product): Record<string, unknown> {
     priceCents: product.priceCents,
     compareAtPriceCents: product.compareAtPriceCents,
     stock: product.stock,
+    lowStockThreshold: product.lowStockThreshold,
     isActive: product.isActive,
     imageUrl: product.imageUrl,
   };
@@ -122,9 +124,14 @@ export async function createProduct(
         priceCents: input.priceCents,
         compareAtPriceCents: input.compareAtPriceCents ?? null,
         stock: input.stock,
+        lowStockThreshold: input.lowStockThreshold,
         isActive: input.isActive,
         imageUrl: input.imageUrl ?? null,
       });
+
+      // El kardex arranca con el stock de alta (014 T11): sin este `initial`,
+      // `sum(qty_delta)` no cuadraría con `products.stock` (AC6).
+      await recordInitialMovement(tx, product.id, product.stock, actor?.id ?? null);
 
       await logAudit(tx, {
         actorId: actor?.id ?? null,
@@ -176,7 +183,8 @@ export async function updateProduct(
           input.compareAtPriceCents === undefined
             ? current.compareAtPriceCents
             : (input.compareAtPriceCents ?? null),
-        stock: input.stock ?? current.stock,
+        // `stock` no viaja aquí: lo mueve solo el módulo de inventario (AC9).
+        lowStockThreshold: input.lowStockThreshold ?? current.lowStockThreshold,
         isActive: input.isActive ?? current.isActive,
         imageUrl: input.imageUrl === undefined ? current.imageUrl : (input.imageUrl ?? null),
       });

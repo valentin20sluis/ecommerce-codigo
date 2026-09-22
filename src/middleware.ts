@@ -24,6 +24,10 @@ const isAdminRoute = createRouteMatcher(["/admin(.*)", "/api/admin(.*)"]);
  * y productos quedan sin autenticación. Las rutas se listan con el `/` explícito para
  * que un prefijo vecino como `/admin/categories-internas` o `/api/admin/productsX` no
  * herede la exención. Configuración de desarrollo local; ver los planes de cierre.
+ *
+ * `/admin/inventory` y `/api/admin/inventory` quedan deliberadamente fuera de esta
+ * lista (014 T16): mueven stock y exigen sesión en el borde, más `inventory.read` /
+ * `inventory.adjust` por código en cada handler.
  */
 const isUnauthenticatedRoute = createRouteMatcher([
   "/admin/categories",

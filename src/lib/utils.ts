@@ -18,6 +18,16 @@ export function formatPriceFromCents(cents: number): string {
   return priceFormatter.format(cents / 100)
 }
 
+const dateTimeFormatter = new Intl.DateTimeFormat("es", {
+  dateStyle: "short",
+  timeStyle: "short",
+})
+
+/** Fecha y hora de una marca ISO del servidor, tal como la ven las tablas del panel. */
+export function formatDateTime(value: string): string {
+  return dateTimeFormatter.format(new Date(value))
+}
+
 /**
  * "19.99" → 1999. `parseFloat(x) * 100` da 1998.9999…: el `Math.round` es
  * obligatorio, no cosmético. Devuelve `NaN` si el texto no es un número.

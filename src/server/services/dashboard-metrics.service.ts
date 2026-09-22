@@ -1,8 +1,4 @@
-import {
-  LOW_STOCK_LIMIT,
-  LOW_STOCK_THRESHOLD,
-  TOP_PRODUCTS_LIMIT,
-} from "@/modules/dashboard/constants";
+import { LOW_STOCK_LIMIT, TOP_PRODUCTS_LIMIT } from "@/modules/dashboard/constants";
 import type { DashboardRange } from "@/modules/dashboard/schemas/metrics.schema";
 import type { DashboardMetricsDto } from "@/modules/dashboard/types/metrics";
 import type { DailySalesPoint } from "@/server/repositories/order.repository";
@@ -57,7 +53,8 @@ export async function getDashboardMetrics(range: DashboardRange): Promise<Dashbo
     orderRepository.getSalesSummary(from, to),
     orderRepository.getDailySales(from, to),
     orderRepository.getTopProducts(from, to, TOP_PRODUCTS_LIMIT),
-    productRepository.listLowStock(LOW_STOCK_THRESHOLD, LOW_STOCK_LIMIT),
+    // El umbral lo pone cada producto (014 D7), no el dashboard.
+    productRepository.listLowStock(LOW_STOCK_LIMIT),
   ]);
 
   return {

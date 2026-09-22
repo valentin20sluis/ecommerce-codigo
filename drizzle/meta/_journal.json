@@ -64,6 +64,20 @@
       "when": 1789780153979,
       "tag": "0008_dapper_hellion",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789926445902,
+      "tag": "0009_colorful_polaris",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790043476533,
+      "tag": "0010_worried_tarantula",
+      "breakpoints": true
     }
   ]
 }

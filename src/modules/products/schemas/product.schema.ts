@@ -36,15 +36,24 @@ export const createProductSchema = z.object({
   priceCents: z.number().int().min(0),
   compareAtPriceCents: z.number().int().min(0).nullish(),
   stock: z.number().int().min(0),
+  lowStockThreshold: z.number().int().min(0).default(5),
   isActive: z.boolean().default(true),
   imageUrl: z.preprocess(emptyToUndefined, imageUrlSchema.nullish()),
 });
 
-export const updateProductSchema = createProductSchema.partial().extend({
-  // `.partial()` no anula el `.default(true)`: sin esto un PATCH que omite
-  // `isActive` reactivaría el producto en silencio (verificado en 002 T21).
-  isActive: z.boolean().optional(),
-});
+export const updateProductSchema = createProductSchema
+  .partial()
+  .omit({ stock: true })
+  .extend({
+    // `.partial()` no anula el `.default(true)`: sin esto un PATCH que omite
+    // `isActive` reactivaría el producto en silencio (verificado en 002 T21).
+    isActive: z.boolean().optional(),
+    // 014 AC9: el stock solo se mueve por `stock_movements`. Un PATCH que lo
+    // traiga se rechaza con 400 en vez de ignorarlo en silencio.
+    stock: z
+      .never({ error: "El stock solo cambia desde el módulo de inventario." })
+      .optional(),
+  });
 
 export const productsQuerySchema = z.object({
   q: z.string().trim().max(120).optional(),
@@ -81,6 +90,7 @@ export const productFormSchema = z.object({
     z.string().trim().regex(/^\d+([.,]\d{1,2})?$/, "Usa un número con hasta dos decimales."),
   ]),
   stock: z.string().trim().regex(/^\d+$/, "Un entero mayor o igual a cero."),
+  lowStockThreshold: z.string().trim().regex(/^\d+$/, "Un entero mayor o igual a cero."),
   isActive: z.boolean(),
   imageUrl: z.union([z.literal(""), imageUrlSchema]),
 });

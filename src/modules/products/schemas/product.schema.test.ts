@@ -65,6 +65,14 @@ describe("updateProductSchema", () => {
     assert.equal(result.success, true);
     assert.equal(result.data?.isActive, undefined);
   });
+
+  it("rejects a payload that tries to set stock: it only moves through the inventory module", () => {
+    assert.equal(updateProductSchema.safeParse({ name: "Nuevo nombre", stock: 5 }).success, false);
+  });
+
+  it("accepts a lowStockThreshold", () => {
+    assert.equal(updateProductSchema.safeParse({ lowStockThreshold: 2 }).success, true);
+  });
 });
 
 describe("productsQuerySchema", () => {
@@ -97,6 +105,7 @@ describe("productFormSchema", () => {
     categoryId: CATEGORY_ID,
     compareAtPrice: "",
     stock: "5",
+    lowStockThreshold: "5",
     isActive: true,
     imageUrl: "",
   };
@@ -111,6 +120,16 @@ describe("productFormSchema", () => {
     const result = productFormSchema.safeParse({ ...baseForm, price: "19.99" });
 
     assert.equal(result.success, true);
+  });
+
+  it("rejects a low stock threshold that is not a whole number", () => {
+    const result = productFormSchema.safeParse({
+      ...baseForm,
+      price: "19.99",
+      lowStockThreshold: "2.5",
+    });
+
+    assert.equal(result.success, false);
   });
 });
 

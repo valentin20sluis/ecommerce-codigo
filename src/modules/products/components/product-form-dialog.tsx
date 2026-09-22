@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -36,6 +36,7 @@ import {
   productFormSchema,
   type CreateProductInput,
   type ProductFormValues,
+  type UpdateProductInput,
 } from "@/modules/products/schemas/product.schema";
 import type { ProductDto } from "@/modules/products/types";
 
@@ -54,6 +55,7 @@ const EMPTY_VALUES: ProductFormValues = {
   price: "",
   compareAtPrice: "",
   stock: "0",
+  lowStockThreshold: "5",
   isActive: true,
   imageUrl: "",
 };
@@ -92,6 +94,7 @@ export function ProductFormDialog({ open, onOpenChange, product }: ProductFormDi
             compareAtPrice:
               product.compareAtPriceCents != null ? fromCents(product.compareAtPriceCents) : "",
             stock: String(product.stock),
+            lowStockThreshold: String(product.lowStockThreshold),
             isActive: product.isActive,
             imageUrl: product.imageUrl ?? "",
           }
@@ -118,7 +121,8 @@ export function ProductFormDialog({ open, onOpenChange, product }: ProductFormDi
     const imageUrl = values.imageUrl.trim();
     const compareAtPrice = values.compareAtPrice.trim();
 
-    const input: CreateProductInput = {
+    // `stock` queda fuera: el PATCH lo rechaza y solo el inventario lo mueve (014 AC9).
+    const shared = {
       name: values.name,
       slug: values.slug,
       // `undefined`, nunca `""`: dos productos sin SKU chocarían contra el índice único (D2).
@@ -127,16 +131,18 @@ export function ProductFormDialog({ open, onOpenChange, product }: ProductFormDi
       categoryId: values.categoryId,
       priceCents: toCents(values.price),
       compareAtPriceCents: compareAtPrice ? toCents(compareAtPrice) : null,
-      stock: Number.parseInt(values.stock, 10),
+      lowStockThreshold: Number.parseInt(values.lowStockThreshold, 10),
       isActive: values.isActive,
       imageUrl: imageUrl ? imageUrl : null,
-    };
+    } satisfies UpdateProductInput;
 
     try {
       if (product) {
-        await updateProduct.mutateAsync({ id: product.id, input });
+        await updateProduct.mutateAsync({ id: product.id, input: shared });
         toast.success("Producto actualizado.");
       } else {
+        const input: CreateProductInput = { ...shared, stock: Number.parseInt(values.stock, 10) };
+
         await createProduct.mutateAsync(input);
         toast.success("Producto creado.");
       }
@@ -225,11 +231,38 @@ export function ProductFormDialog({ open, onOpenChange, product }: ProductFormDi
             </Field>
           </div>
 
-          <Field>
-            <FieldLabel htmlFor="product-stock">Stock</FieldLabel>
-            <Input id="product-stock" inputMode="numeric" placeholder="0" {...register("stock")} />
-            <FieldError errors={[formState.errors.stock]} />
-          </Field>
+          <div className="grid grid-cols-2 gap-4">
+            <Field>
+              <FieldLabel htmlFor="product-stock">Stock</FieldLabel>
+              <Input
+                id="product-stock"
+                inputMode="numeric"
+                placeholder="0"
+                // En edición el stock es de solo lectura: se mueve con kardex
+                // desde Inventario, nunca sobrescribiéndolo aquí (014 AC9).
+                readOnly={isEditing}
+                aria-readonly={isEditing}
+                className={isEditing ? "bg-muted text-muted-foreground" : undefined}
+                {...register("stock")}
+              />
+              {isEditing ? (
+                <FieldDescription>Ajústalo desde Inventario para dejar rastro.</FieldDescription>
+              ) : null}
+              <FieldError errors={[formState.errors.stock]} />
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="product-low-stock-threshold">Umbral de stock bajo</FieldLabel>
+              <Input
+                id="product-low-stock-threshold"
+                inputMode="numeric"
+                placeholder="5"
+                {...register("lowStockThreshold")}
+              />
+              <FieldDescription>Con este stock o menos, entra en alerta.</FieldDescription>
+              <FieldError errors={[formState.errors.lowStockThreshold]} />
+            </Field>
+          </div>
 
           <Field>
             <FieldLabel htmlFor="product-image-url">URL de imagen (opcional)</FieldLabel>

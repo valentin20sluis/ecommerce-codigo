@@ -32,7 +32,8 @@ export type AdminOrdersQuery = z.infer<typeof adminOrdersQuerySchema>;
 /**
  * Zod solo comprueba pertenencia al enum (012 D3): que el estado pedido sea el
  * siguiente válido depende del estado actual en base de datos, así que esa regla
- * la valida el service y responde 409.
+ * la valida el service y responde 409. `canceled` ya pertenecía al enum y desde
+ * 014 (D6) es un destino real del PATCH: cancela y repone stock.
  */
 export const updateOrderStatusSchema = z.object({
   status: z.enum(ORDER_STATUS_VALUES),

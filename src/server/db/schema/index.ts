@@ -7,5 +7,6 @@ export * from "./permission";
 export * from "./product";
 export * from "./role";
 export * from "./role-permission";
+export * from "./stock-movement";
 export * from "./user";
 export * from "./user-role";

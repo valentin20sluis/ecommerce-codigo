@@ -1,13 +1,17 @@
 "use client";
 
 import { useMemo } from "react";
-import { ArrowRightIcon } from "lucide-react";
+import { ArrowRightIcon, BanIcon } from "lucide-react";
 
 import { createDataTableColumnHelper, DataTable } from "@/components/shared/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatPriceFromCents } from "@/lib/utils";
-import { ORDER_FULFILLMENT_NEXT, ORDER_STATUS_VIEW } from "@/modules/orders/constants";
+import { formatDateTime, formatPriceFromCents } from "@/lib/utils";
+import {
+  CANCELABLE_STATUSES,
+  ORDER_FULFILLMENT_NEXT,
+  ORDER_STATUS_VIEW,
+} from "@/modules/orders/constants";
 import type { AdminOrderListItem } from "@/modules/orders/types/admin-order";
 import type { OrderStatus } from "@/server/db/schema";
 
@@ -20,15 +24,13 @@ type AdminOrderTableProps = {
   total: number;
   onPageChange: (page: number) => void;
   onAdvance: (order: AdminOrderListItem, next: OrderStatus) => void;
+  /** Cancelar repone stock, así que el gestor pide confirmación antes del PATCH. */
+  onCancel: (order: AdminOrderListItem) => void;
   /** Pedido con el `PATCH` en vuelo: su botón queda deshabilitado mientras dura. */
   pendingOrderId: string | null;
 };
 
 const helper = createDataTableColumnHelper<AdminOrderListItem>();
-
-function formatDate(value: string): string {
-  return new Date(value).toLocaleString("es", { dateStyle: "short", timeStyle: "short" });
-}
 
 export function AdminOrderTable({
   orders,
@@ -39,6 +41,7 @@ export function AdminOrderTable({
   total,
   onPageChange,
   onAdvance,
+  onCancel,
   pendingOrderId,
 }: AdminOrderTableProps) {
   const columns = useMemo(
@@ -70,7 +73,7 @@ export function AdminOrderTable({
           header: "Fecha",
           cell: (context) => (
             <span className="text-muted-foreground text-xs whitespace-nowrap">
-              {formatDate(context.getValue())}
+              {formatDateTime(context.getValue())}
             </span>
           ),
         }),
@@ -95,30 +98,47 @@ export function AdminOrderTable({
           cell: (context) => {
             const order = context.row.original;
             const next = ORDER_FULFILLMENT_NEXT[order.status];
+            const isCancelable = CANCELABLE_STATUSES.includes(order.status);
+            const isPending = pendingOrderId === order.id;
 
-            // Estado terminal o fuera del flujo de fulfillment: no hay avance posible (AC5).
-            if (!next) {
+            // Estado terminal o fuera del flujo: ni avance ni cancelación (012 AC5).
+            if (!next && !isCancelable) {
               return <span className="text-muted-foreground flex justify-end text-sm">—</span>;
             }
 
             return (
-              <div className="flex justify-end">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={pendingOrderId === order.id}
-                  onClick={() => onAdvance(order, next)}
-                  aria-label={`Avanzar el pedido ${order.id.slice(0, 8)} a ${ORDER_STATUS_VIEW[next].label}`}
-                >
-                  <ArrowRightIcon className="size-4" />
-                  {ORDER_STATUS_VIEW[next].label}
-                </Button>
+              <div className="flex justify-end gap-2">
+                {isCancelable ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={isPending}
+                    onClick={() => onCancel(order)}
+                    aria-label={`Cancelar el pedido ${order.id.slice(0, 8)} y reponer su stock`}
+                  >
+                    <BanIcon className="size-4" />
+                    Cancelar
+                  </Button>
+                ) : null}
+
+                {next ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={isPending}
+                    onClick={() => onAdvance(order, next)}
+                    aria-label={`Avanzar el pedido ${order.id.slice(0, 8)} a ${ORDER_STATUS_VIEW[next].label}`}
+                  >
+                    <ArrowRightIcon className="size-4" />
+                    {ORDER_STATUS_VIEW[next].label}
+                  </Button>
+                ) : null}
               </div>
             );
           },
         }),
       ]),
-    [onAdvance, pendingOrderId],
+    [onAdvance, onCancel, pendingOrderId],
   );
 
   return (
