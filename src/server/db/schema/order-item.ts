@@ -19,6 +19,9 @@ export const orderItems = pgTable(
     nameSnapshot: text("name_snapshot").notNull(),
     /** Precio congelado en centavos; nunca se relee de `products` después. */
     unitPriceCents: integer("unit_price_cents").notNull(),
+    /** Costo congelado al momento de la venta (015 D2). Si el producto no tenía
+     * costo cargado, queda NULL para siempre: no se rellena retroactivamente. */
+    costCentsSnapshot: integer("cost_cents_snapshot"),
     qty: integer("qty").notNull(),
   },
   (t) => [index("order_items_order_id_idx").on(t.orderId)],

@@ -22,6 +22,7 @@ describe("toOrderSummaryDto", () => {
         productId: "p1",
         nameSnapshot: "P",
         unitPriceCents: 500,
+        costCentsSnapshot: null,
         qty: 2,
       },
     ],

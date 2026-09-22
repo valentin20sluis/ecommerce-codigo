@@ -27,7 +27,12 @@ export const products = pgTable(
       .references(() => categories.id, { onDelete: "restrict" }),
     priceCents: integer("price_cents").notNull(),
     compareAtPriceCents: integer("compare_at_price_cents"),
+    /** Costo unitario actual (015 D1). Nullable a propósito: sin costo cargado,
+     * el margen se muestra como "sin dato", nunca como un 0 o un 100% falso. */
+    costCents: integer("cost_cents"),
     stock: integer("stock").notNull().default(0),
+    /** Umbral propio de la alerta de stock bajo (014); reemplaza la constante fija de 013. */
+    lowStockThreshold: integer("low_stock_threshold").notNull().default(5),
     isActive: boolean("is_active").notNull().default(true),
     imageUrl: text("image_url"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
