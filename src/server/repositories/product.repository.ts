@@ -64,9 +64,13 @@ export type ProductValues = Pick<
   | "priceCents"
   | "compareAtPriceCents"
   | "stock"
+  | "lowStockThreshold"
   | "isActive"
   | "imageUrl"
 >;
+
+/** Alta y edición ya no comparten campos: el stock solo se fija al crear (014 T11). */
+export type ProductUpdateValues = Omit<ProductValues, "stock">;
 
 /** Fila del listado: nombre y slug de categoría se resuelven en el join, no en el cliente. */
 export type ProductListRow = Product & { categoryName: string; categorySlug: string };
@@ -213,7 +217,7 @@ export async function create(executor: Executor, values: ProductValues): Promise
 export async function update(
   executor: Executor,
   id: string,
-  values: ProductValues,
+  values: ProductUpdateValues,
 ): Promise<Product | null> {
   const [row] = await executor
     .update(products)
@@ -228,15 +232,17 @@ export async function remove(executor: Executor, id: string): Promise<void> {
   await executor.delete(products).where(eq(products.id, id));
 }
 
-export type LowStockProduct = Pick<Product, "id" | "name" | "slug" | "stock">;
+export type LowStockProduct = Pick<
+  Product,
+  "id" | "name" | "slug" | "stock" | "lowStockThreshold"
+>;
 
 /**
- * Alerta de inventario del dashboard (013 D7): solo activos, porque un producto
- * dado de baja no se vende y no es alerta. Orden por stock asc para que lo más
- * urgente quede arriba; el límite lo fija el llamador.
+ * Alerta de inventario del dashboard (013 D7, umbral por producto en 014): solo
+ * activos, porque un producto dado de baja no se vende y no es alerta. Orden por
+ * stock asc para que lo más urgente quede arriba; el límite lo fija el llamador.
  */
 export async function listLowStock(
-  threshold: number,
   limit: number,
   executor: ReadExecutor = db,
 ): Promise<LowStockProduct[]> {
@@ -246,28 +252,198 @@ export async function listLowStock(
       name: products.name,
       slug: products.slug,
       stock: products.stock,
+      lowStockThreshold: products.lowStockThreshold,
     })
     .from(products)
-    .where(and(eq(products.isActive, true), lte(products.stock, threshold)))
+    .where(and(eq(products.isActive, true), lte(products.stock, products.lowStockThreshold)))
     .orderBy(asc(products.stock))
     .limit(limit);
 }
 
-export type StockDecrement = { productId: string; qty: number };
+/**
+ * Suma atómica del delta (014 D3): `stock = stock + delta` en el propio UPDATE,
+ * sin leer-modificar-escribir, y el `RETURNING` entrega el `stock_after` que
+ * persiste el kardex. Se aplica **sin clamp** a propósito (008): una sobreventa
+ * queda visible como stock negativo en vez de perderse en silencio.
+ */
+export async function applyStockDelta(
+  executor: Executor,
+  id: string,
+  delta: number,
+): Promise<Product | null> {
+  const [row] = await executor
+    .update(products)
+    .set({ stock: sql`${products.stock} + ${delta}`, updatedAt: new Date() })
+    .where(eq(products.id, id))
+    .returning();
+
+  return row ?? null;
+}
 
 /**
- * Descuento post-cobro (008): se resta **sin clamp** a propósito. Rechazar aquí
- * sería quedarse con el dinero del cliente, así que una sobreventa queda visible
- * como stock negativo en el admin en vez de perderse en silencio.
+ * Bloqueo optimista del conteo físico (014 D3): el stock esperado viaja en el
+ * `WHERE`, así que si otro movimiento entró entre la lectura del admin y el
+ * guardado no hay fila y el servicio responde 409 sin escribir movimiento (AC2).
  */
-export async function decrementStock(
+export async function setStockIfUnchanged(
   executor: Executor,
-  items: StockDecrement[],
-): Promise<void> {
-  for (const item of items) {
-    await executor
-      .update(products)
-      .set({ stock: sql`${products.stock} - ${item.qty}`, updatedAt: new Date() })
-      .where(eq(products.id, item.productId));
+  id: string,
+  expected: number,
+  next: number,
+): Promise<Product | null> {
+  const [row] = await executor
+    .update(products)
+    .set({ stock: next, updatedAt: new Date() })
+    .where(and(eq(products.id, id), eq(products.stock, expected)))
+    .returning();
+
+  return row ?? null;
+}
+
+export const INVENTORY_FILTERS = ["all", "low", "negative"] as const;
+
+export type InventoryFilter = (typeof INVENTORY_FILTERS)[number];
+
+export type ListInventoryParams = {
+  q?: string;
+  filter: InventoryFilter;
+  page: number;
+  pageSize: number;
+};
+
+/** Fila del listado de inventario: sin precios ni descripción, con la categoría del join. */
+export type InventoryRow = Pick<
+  Product,
+  "id" | "name" | "slug" | "sku" | "stock" | "lowStockThreshold" | "isActive" | "updatedAt"
+> & { categoryName: string };
+
+function inventoryFilterCondition(filter: InventoryFilter): SQL | undefined {
+  switch (filter) {
+    case "low":
+      return lte(products.stock, products.lowStockThreshold);
+    case "negative":
+      return lt(products.stock, 0);
+    case "all":
+      return undefined;
   }
+}
+
+/**
+ * Listado del módulo (014). Una consulta por página más el `count(*)`: no
+ * resuelve el último movimiento fila por fila, que sería el N+1 de §Notas.
+ */
+export async function listInventory(
+  params: ListInventoryParams,
+  executor: ReadExecutor = db,
+): Promise<{ data: InventoryRow[]; total: number }> {
+  const conditions: SQL[] = [];
+
+  const term = params.q?.trim();
+  if (term) {
+    const pattern = `%${term}%`;
+    const match = or(ilike(products.name, pattern), ilike(products.sku, pattern));
+    if (match) conditions.push(match);
+  }
+
+  const filterCondition = inventoryFilterCondition(params.filter);
+  if (filterCondition) conditions.push(filterCondition);
+
+  const filter = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const columns = {
+    id: products.id,
+    name: products.name,
+    slug: products.slug,
+    sku: products.sku,
+    stock: products.stock,
+    lowStockThreshold: products.lowStockThreshold,
+    isActive: products.isActive,
+    updatedAt: products.updatedAt,
+    categoryName: categories.name,
+  };
+
+  const [{ total }] = await executor
+    .select({ total: sql<number>`count(*)::int` })
+    .from(products)
+    .innerJoin(categories, eq(products.categoryId, categories.id))
+    .where(filter);
+
+  const data = await executor
+    .select(columns)
+    .from(products)
+    .innerJoin(categories, eq(products.categoryId, categories.id))
+    .where(filter)
+    // Lo más urgente arriba: primero los negativos, luego el stock más bajo.
+    .orderBy(asc(products.stock), asc(products.name))
+    .limit(params.pageSize)
+    .offset((params.page - 1) * params.pageSize);
+
+  return { data, total };
+}
+
+export type UnitPriceParams = {
+  q?: string;
+  page: number;
+  pageSize: number;
+};
+
+/** Fila del listado de Finanzas: solo lo necesario para precio, costo y margen. */
+export type UnitPriceRow = Pick<Product, "id" | "name" | "sku" | "priceCents" | "costCents">;
+
+/**
+ * Listado del módulo de Finanzas (015). Sin join de categoría: el reporte de
+ * margen no la necesita. Una consulta por página más el `count(*)`.
+ */
+export async function listUnitPrices(
+  params: UnitPriceParams,
+  executor: ReadExecutor = db,
+): Promise<{ data: UnitPriceRow[]; total: number }> {
+  const conditions: SQL[] = [];
+
+  const term = params.q?.trim();
+  if (term) {
+    const pattern = `%${term}%`;
+    const match = or(ilike(products.name, pattern), ilike(products.sku, pattern));
+    if (match) conditions.push(match);
+  }
+
+  const filter = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const columns = {
+    id: products.id,
+    name: products.name,
+    sku: products.sku,
+    priceCents: products.priceCents,
+    costCents: products.costCents,
+  };
+
+  const [{ total }] = await executor
+    .select({ total: sql<number>`count(*)::int` })
+    .from(products)
+    .where(filter);
+
+  const data = await executor
+    .select(columns)
+    .from(products)
+    .where(filter)
+    .orderBy(asc(products.name))
+    .limit(params.pageSize)
+    .offset((params.page - 1) * params.pageSize);
+
+  return { data, total };
+}
+
+/** Edición de costo (015 D3): `costCents: null` borra un costo cargado por error. */
+export async function updateCost(
+  executor: Executor,
+  id: string,
+  costCents: number | null,
+): Promise<Product | null> {
+  const [row] = await executor
+    .update(products)
+    .set({ costCents, updatedAt: new Date() })
+    .where(eq(products.id, id))
+    .returning();
+
+  return row ?? null;
 }
