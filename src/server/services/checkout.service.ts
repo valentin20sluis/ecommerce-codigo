@@ -50,6 +50,9 @@ async function resolveLines(items: CheckoutLineInput[]): Promise<OrderItemValues
       productId: product.id,
       nameSnapshot: product.name,
       unitPriceCents: product.priceCents,
+      // 015 D2: mismo instante en que se congela el precio. Si el producto no
+      // tenía costo cargado, queda NULL para siempre — no se recalcula después.
+      costCentsSnapshot: product.costCents,
       qty: item.qty,
     };
   });

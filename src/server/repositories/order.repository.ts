@@ -22,7 +22,7 @@ export type OrderValues = Pick<
 
 export type OrderItemValues = Pick<
   NewOrderItem,
-  "productId" | "nameSnapshot" | "unitPriceCents" | "qty"
+  "productId" | "nameSnapshot" | "unitPriceCents" | "costCentsSnapshot" | "qty"
 >;
 
 export type OrderWithItems = Order & { items: OrderItem[] };
@@ -151,7 +151,16 @@ export async function attachStripeSession(
 }
 
 /**
- * Idempotencia atómica del webhook: el `status <> 'paid'` viaja en el propio
+ * Estados desde los que un cobro confirmado puede marcar la orden como pagada:
+ * la compra recién creada y la de pago diferido que antes falló y luego sí entró
+ * (`async_payment_failed` → `async_payment_succeeded`). Todo lo demás queda
+ * fuera, incluido `canceled`: con el kardex de 014, una reentrega tardía de
+ * `checkout.session.completed` lo resucitaría con su `return` ya escrito.
+ */
+const PAYABLE_STATUSES: OrderStatus[] = ["pending_payment", "payment_failed"];
+
+/**
+ * Idempotencia atómica del webhook: el estado de origen viaja en el propio
  * UPDATE, así que una reentrega del mismo evento no devuelve fila y el llamador
  * corta sin volver a descontar stock.
  */
@@ -163,7 +172,7 @@ export async function markPaid(
   const [order] = await executor
     .update(orders)
     .set({ status: "paid", stripePaymentIntentId, updatedAt: new Date() })
-    .where(and(eq(orders.id, orderId), ne(orders.status, "paid")))
+    .where(and(eq(orders.id, orderId), inArray(orders.status, PAYABLE_STATUSES)))
     .returning();
 
   return order ?? null;
