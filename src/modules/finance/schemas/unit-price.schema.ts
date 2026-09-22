@@ -8,22 +8,19 @@ export const unitPriceQuerySchema = z.object({
 
 export type UnitPriceQuery = z.infer<typeof unitPriceQuerySchema>;
 
+/**
+ * Tope de cordura (revisión 015 I1): sin él, un costo mayor al rango `int4`
+ * de Postgres pasa la validación y revienta en la BD como un 500 opaco en vez
+ * de un 400 con mensaje. $999,999.99 por unidad es un techo generoso.
+ */
+export const MAX_COST_CENTS = 99_999_999;
+
 /** `costCents: null` es una entrada válida (015 D1/D3): borra el costo cargado. */
 export const updateCostSchema = z.object({
-  costCents: z.number().int().min(0).nullable(),
+  costCents: z.number().int().min(0).max(MAX_COST_CENTS).nullable(),
 });
 
 export type UpdateCostInput = z.infer<typeof updateCostSchema>;
-
-/** El formulario no es la API: captura el costo como texto ("19.99"); "" = sin costo. */
-export const costFormSchema = z.object({
-  cost: z.union([
-    z.literal(""),
-    z.string().trim().regex(/^\d+([.,]\d{1,2})?$/, "Usa un número con hasta dos decimales."),
-  ]),
-});
-
-export type CostFormValues = z.infer<typeof costFormSchema>;
 
 /**
  * "19.99" → 1999, misma fórmula que `toCents` de `@/lib/utils`, reimplementada
@@ -36,6 +33,28 @@ function parseCostToCents(value: string): number {
   const parsed = Number.parseFloat(value.replace(",", "."));
   return Number.isFinite(parsed) ? Math.round(parsed * 100) : Number.NaN;
 }
+
+/** El formulario no es la API: captura el costo como texto ("19.99"); "" = sin costo. */
+export const costFormSchema = z
+  .object({
+    cost: z.union([
+      z.literal(""),
+      z.string().trim().regex(/^\d+([.,]\d{1,2})?$/, "Usa un número con hasta dos decimales."),
+    ]),
+  })
+  .superRefine((values, ctx) => {
+    if (values.cost === "") return;
+
+    if (parseCostToCents(values.cost) > MAX_COST_CENTS) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["cost"],
+        message: `El costo no puede superar ${(MAX_COST_CENTS / 100).toFixed(2)}.`,
+      });
+    }
+  });
+
+export type CostFormValues = z.infer<typeof costFormSchema>;
 
 /**
  * Traduce el formulario al contrato de la API con el mismo schema que usará el

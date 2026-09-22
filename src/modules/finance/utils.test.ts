@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { computeMargin } from "./finance.math.ts";
+import { computeMargin } from "./utils.ts";
 
 describe("computeMargin", () => {
   it("returns null margin when there is no cost loaded", () => {

@@ -1,4 +1,4 @@
-import { computeMargin } from "@/server/services/finance.math";
+import { computeMargin } from "@/modules/finance/utils";
 import type { UnitPriceRow } from "@/server/repositories/product.repository";
 import type { Paginated } from "@/types/api";
 

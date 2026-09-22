@@ -75,7 +75,7 @@ describe("formatOrderTime", () => {
 
 describe("countOrderUnits", () => {
   it("sums the qty of every item in an order", () => {
-    const withItems = order({ items: [{ id: "i1", orderId: "o1", productId: "p1", nameSnapshot: "A", unitPriceCents: 100, costCentsSnapshot: null, qty: 2 }, { id: "i2", orderId: "o1", productId: "p2", nameSnapshot: "B", unitPriceCents: 200, costCentsSnapshot: null, qty: 1 }] });
+    const withItems = order({ items: [{ id: "i1", orderId: "o1", productId: "p1", nameSnapshot: "A", unitPriceCents: 100, qty: 2 }, { id: "i2", orderId: "o1", productId: "p2", nameSnapshot: "B", unitPriceCents: 200, qty: 1 }] });
 
     assert.equal(countOrderUnits(withItems), 3);
   });

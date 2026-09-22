@@ -35,9 +35,17 @@ describe("toOrderListItemDto", () => {
     assert.equal(dto.updatedAt, "2026-01-05T11:00:00.000Z");
   });
 
-  it("keeps the order items untouched in the output", () => {
+  it("keeps the customer-facing item fields in the output", () => {
     const dto = toOrderListItemDto(order);
 
-    assert.deepEqual(dto.items, order.items);
+    assert.deepEqual(dto.items, [
+      { id: "i1", orderId: "o1", productId: "p1", nameSnapshot: "P", unitPriceCents: 500, qty: 2 },
+    ]);
+  });
+
+  it("never exposes costCentsSnapshot to the customer (015 confidentiality)", () => {
+    const dto = toOrderListItemDto(order);
+
+    assert.equal("costCentsSnapshot" in dto.items[0], false);
   });
 });

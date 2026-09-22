@@ -21,6 +21,10 @@ describe("updateCostSchema", () => {
   it("rejects a non-integer cost", () => {
     assert.equal(updateCostSchema.safeParse({ costCents: 12.5 }).success, false);
   });
+
+  it("rejects a cost above the sanity ceiling (015 review I1)", () => {
+    assert.equal(updateCostSchema.safeParse({ costCents: 100_000_000 }).success, false);
+  });
 });
 
 describe("costFormSchema", () => {
@@ -34,6 +38,10 @@ describe("costFormSchema", () => {
 
   it("rejects text that is not a number", () => {
     assert.equal(costFormSchema.safeParse({ cost: "abc" }).success, false);
+  });
+
+  it("rejects an amount above the sanity ceiling (015 review I1)", () => {
+    assert.equal(costFormSchema.safeParse({ cost: "1000000.00" }).success, false);
   });
 });
 

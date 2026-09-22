@@ -5,6 +5,12 @@ export type Margin = { marginCents: number | null; marginPercent: number | null 
  * valores se calcula — un `costCents: null` no es un costo de `0`, así que no
  * se puede confundir un margen del 100% con la ausencia total del dato.
  * `marginPercent` se redondea a un decimal para la tabla del panel.
+ *
+ * Vive en `src/modules/finance/` y no en `src/server/services/` (revisión 015
+ * I2): es una función pura sin I/O, pero `modules/finance/types/finance.ts`
+ * la necesita y ese archivo es alcanzable por componentes cliente — SETUP.md
+ * §3 es tajante: `server/` es solo servidor, nunca se importa desde el
+ * cliente, sin excepción por pureza. Mismo criterio que `orders/utils.ts`.
  */
 export function computeMargin(priceCents: number, costCents: number | null): Margin {
   if (costCents === null) return { marginCents: null, marginPercent: null };
