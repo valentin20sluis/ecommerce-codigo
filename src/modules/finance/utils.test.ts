@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { computeMargin } from "./utils.ts";
+import {
+  computeMargin,
+  fillMissingDaysInRange,
+  resolveDateRangePreset,
+  resolveMarginCoverage,
+} from "./utils.ts";
 
 describe("computeMargin", () => {
   it("returns null margin when there is no cost loaded", () => {
@@ -26,5 +31,107 @@ describe("computeMargin", () => {
 
   it("does not divide by zero when priceCents is zero", () => {
     assert.deepEqual(computeMargin(0, 0), { marginCents: 0, marginPercent: 0 });
+  });
+});
+
+describe("resolveMarginCoverage", () => {
+  it("returns null margin and 0% coverage when nothing has a known cost", () => {
+    assert.deepEqual(resolveMarginCoverage(0, 0, 50000), { marginCents: null, marginCoveragePercent: 0 });
+  });
+
+  it("returns full coverage when every cent of revenue has a known cost", () => {
+    assert.deepEqual(resolveMarginCoverage(20000, 50000, 50000), {
+      marginCents: 20000,
+      marginCoveragePercent: 100,
+    });
+  });
+
+  it("computes partial coverage rounded to one decimal", () => {
+    assert.deepEqual(resolveMarginCoverage(10000, 25000, 75000), {
+      marginCents: 10000,
+      marginCoveragePercent: 33.3,
+    });
+  });
+
+  it("treats zero total revenue as 0% coverage without dividing by zero", () => {
+    assert.deepEqual(resolveMarginCoverage(0, 0, 0), { marginCents: null, marginCoveragePercent: 0 });
+  });
+});
+
+describe("fillMissingDaysInRange", () => {
+  it("fills every day of a 3-day range with 0 when there are no rows", () => {
+    const from = new Date(Date.UTC(2026, 2, 1));
+    const to = new Date(Date.UTC(2026, 2, 3));
+
+    assert.deepEqual(fillMissingDaysInRange(from, to, []), [
+      { date: "2026-03-01", revenueCents: 0 },
+      { date: "2026-03-02", revenueCents: 0 },
+      { date: "2026-03-03", revenueCents: 0 },
+    ]);
+  });
+
+  it("keeps the known days and zero-fills the gaps", () => {
+    const from = new Date(Date.UTC(2026, 2, 1));
+    const to = new Date(Date.UTC(2026, 2, 3));
+    const rows = [{ date: "2026-03-02", salesCents: 5000 }];
+
+    assert.deepEqual(fillMissingDaysInRange(from, to, rows), [
+      { date: "2026-03-01", revenueCents: 0 },
+      { date: "2026-03-02", revenueCents: 5000 },
+      { date: "2026-03-03", revenueCents: 0 },
+    ]);
+  });
+
+  it("returns a single point for a same-day range", () => {
+    const day = new Date(Date.UTC(2026, 2, 1));
+
+    assert.deepEqual(fillMissingDaysInRange(day, day, []), [{ date: "2026-03-01", revenueCents: 0 }]);
+  });
+});
+
+describe("resolveDateRangePreset", () => {
+  it("resolves 'this_month' from day 1 (local) to now", () => {
+    const now = new Date(2026, 2, 15, 10, 30);
+
+    assert.deepEqual(resolveDateRangePreset("this_month", now), {
+      from: new Date(2026, 2, 1).toISOString(),
+      to: now.toISOString(),
+    });
+  });
+
+  it("resolves 'last_month' as the full previous calendar month, not a rolling window", () => {
+    const now = new Date(2026, 2, 15);
+
+    assert.deepEqual(resolveDateRangePreset("last_month", now), {
+      from: new Date(2026, 1, 1).toISOString(),
+      to: new Date(2026, 2, 1).toISOString(),
+    });
+  });
+
+  it("resolves 'last_month' across a year boundary", () => {
+    const now = new Date(2026, 0, 20);
+
+    assert.deepEqual(resolveDateRangePreset("last_month", now), {
+      from: new Date(2025, 11, 1).toISOString(),
+      to: new Date(2026, 0, 1).toISOString(),
+    });
+  });
+
+  it("resolves 'this_quarter' to the start of the current quarter", () => {
+    const now = new Date(2026, 7, 10);
+
+    assert.deepEqual(resolveDateRangePreset("this_quarter", now), {
+      from: new Date(2026, 6, 1).toISOString(),
+      to: now.toISOString(),
+    });
+  });
+
+  it("resolves 'this_year' to January 1st", () => {
+    const now = new Date(2026, 10, 1);
+
+    assert.deepEqual(resolveDateRangePreset("this_year", now), {
+      from: new Date(2026, 0, 1).toISOString(),
+      to: now.toISOString(),
+    });
   });
 });
