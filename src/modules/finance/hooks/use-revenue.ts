@@ -11,7 +11,7 @@ import {
   type RevenueQuery,
 } from "@/modules/finance/schemas/revenue.schema";
 import { fetchRevenueSummary } from "@/modules/finance/services/revenue.service";
-import { resolveDateRangePreset, type RevenueRangePreset } from "@/modules/finance/utils";
+import { resolveDateRangePreset } from "@/modules/finance/utils";
 
 export const revenueKeys = {
   all: ["finance", "revenue"] as const,
@@ -31,7 +31,7 @@ function resolveQuery(filters: RevenueFilters): RevenueQuery | null {
     return { from: filters.from, to: filters.to };
   }
 
-  return resolveDateRangePreset(filters.preset as RevenueRangePreset);
+  return resolveDateRangePreset(filters.preset);
 }
 
 /** Única traducción entre la URL y `revenueFiltersSchema`, mismo patrón que `useOrderFilters`. */

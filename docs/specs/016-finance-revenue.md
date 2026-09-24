@@ -41,7 +41,7 @@ No incluye:
 |---|---|
 | D1 | Sin permiso nuevo: `finance.read` cubre este reporte, ya concedido a `super_admin`/`admin`/`manager`/`audit` desde la Fase 1. |
 | D2 | El margen se calcula **solo** sobre líneas de `order_items` con `cost_cents_snapshot` no nulo. Se expone `marginCoveragePercent` (qué % de los ingresos del rango viene de líneas con costo conocido) junto al KPI, para que el número no engañe cuando la cobertura es baja. Si la cobertura es 0%, `marginCents` viaja como `null` (mismo criterio D5 de la Fase 1: ausencia de dato ≠ margen 0). Los ingresos totales (`revenueCents`) sí cuentan el 100% de las ventas, tengan o no costo cargado. |
-| D3 | El rango de fechas se resuelve en el **cliente** antes de pedir: los presets se traducen a `from`/`to` concretos en el hook, igual que `orderFiltersSchema` (`period: "month" \| "custom"`) ya hace para el historial de pedidos. El servidor solo valida `from`/`to`, nunca conoce el preset. Un preset "en curso" (**Este mes**, **Este trimestre**, **Este año**) va del inicio del período hasta **hoy** (no hasta el fin del período, que incluiría días futuros sin datos); un preset "cerrado" (**Mes pasado**) va del inicio al fin completo de ese período anterior. |
+| D3 | El rango de fechas se resuelve en el **cliente** antes de pedir: los presets se traducen a `from`/`to` concretos en el hook, igual que `orderFiltersSchema` (`period: "month" \| "custom"`) ya hace para el historial de pedidos. El servidor solo valida `from`/`to`, nunca conoce el preset. Un preset "en curso" (**Este mes**, **Este trimestre**, **Este año**) va del inicio del período hasta **hoy** (no hasta el fin del período, que incluiría días futuros sin datos); un preset "cerrado" (**Mes pasado**) va del inicio al último instante completo de ese período anterior. Qué mes/trimestre/año "es" se decide con el calendario local de quien usa el panel, pero el límite en sí se construye en **UTC** (`Date.UTC(...)`), la misma zona en la que agrupa `getDailySales` y en la que `fillMissingDaysInRange` trunca sus días — corregido en la revisión final (I1): construir el límite en hora local corría la serie diaria hasta 24 h para cualquier operador fuera de UTC+0. |
 | D4 | La tabla por categoría no repite el % de cobertura por fila (ruido visual); una categoría sin ninguna línea con costo conocido muestra "Sin datos suficientes" en la columna Margen. La cobertura global vive una sola vez, en el KPI. |
 | D5 | Tendencia diaria agregada aunque no se pidió explícitamente al inicio — **aprobada por el humano en el diseño**: un rango libre se entiende mejor con una curva que solo con dos números. Reutiliza sin cambios `orderRepository.getDailySales(from, to)` (013), que ya acepta cualquier rango, no solo 7/30/90. |
 | D6 | URL en inglés (`/admin/finance/revenue`), como el resto del panel (`/admin/inventory`, `/admin/orders`); el nav y los títulos dicen "Ingresos" en español. |
@@ -112,7 +112,7 @@ criterio D15 de la Fase 1).
 - [x] AC2 — Dado un rango sin ninguna línea con `cost_cents_snapshot`, entonces `marginCents` viaja `null` y `marginCoveragePercent = 0`; `revenueCents` sigue sumando el 100% de las ventas.
 - [x] AC3 — Dado un rango mixto (algunas líneas con costo, otras sin), entonces `marginCoveragePercent` refleja la proporción real de ingresos con costo conocido, no la proporción de líneas.
 - [x] AC4 — Dado `to < from`, entonces la API responde 400.
-- [ ] AC5 — Dado un usuario sin `finance.read`, entonces `GET /api/admin/finance/revenue` responde 403 y `/admin/finance/revenue` redirige a `/admin`. **Parcial**: el 401 sin sesión está verificado (`curl` sin cookie); el 403 autenticado sin `finance.read` y el redirect de página requieren una sesión real de navegador, no disponible en esta sesión de ejecución.
+- [ ] AC5 — Dado un usuario sin `finance.read`, entonces `GET /api/admin/finance/revenue` responde 403 y `/admin/finance/revenue` redirige a `/admin`. **Parcial**: sin sesión, se verificó con `curl` que `GET /api/admin/finance/revenue` responde 401 (Task 6) y que `GET /admin/finance/revenue` responde 307 a `/sign-in` (Task 11) — ambos prueban que el middleware protege ambas rutas, no que `requirePermission`/el guard de página devuelvan 403/redirect a un usuario **autenticado** sin `finance.read`, que es lo que AC5 pide y que requiere una sesión real de navegador, no disponible en esta sesión de ejecución.
 - [x] AC6 — Dado un rango de 45 días sin ventas en 10 de ellos, entonces `dailyRevenue` trae los 45 puntos, con `revenueCents: 0` en los días sin ventas.
 - [x] AC7 — Dada una categoría sin ninguna línea con costo conocido en el rango, entonces su fila en `byCategory` trae `marginCents: null` y la tabla muestra "Sin datos suficientes".
 - [x] AC8 — Dado el preset "Mes pasado" un 15 de marzo, entonces el rango resuelto es 1–28/29/30/31 de febrero completo (mes calendario anterior, no "últimos 30 días").
@@ -135,7 +135,35 @@ criterio D15 de la Fase 1).
   `/admin/finance/revenue` con una sesión `super_admin`/`admin` y confirmar presets, rango
   libre y coherencia del margen con lo que muestre `/admin/finance/unit-price`.
 
-Verificación final: `npm run typecheck && npm run lint && npm run build && npm test` — 194/194.
+### Hallazgos de la revisión final (fresh reviewer, Opus) y su resolución
+
+- **Importante, corregido (I1):** `resolveDateRangePreset` construía el límite de cada preset
+  en hora local mientras `fillMissingDaysInRange`/`getDailySales` truncan en UTC — para
+  cualquier operador fuera de UTC+0, la serie diaria arrastraba o perdía un día en el borde.
+  Se corrigió construyendo el límite con `Date.UTC(...)` (D3, actualizada arriba). De paso,
+  `last_month` pasó a terminar en el último instante del mes anterior en vez del inicio
+  exclusivo del mes actual: antes de esto, un mes de 28 días (febrero) generaba 29 puntos en
+  la gráfica, y una orden justo en el instante de corte podía contarse en dos meses a la vez.
+- **Importante, corregido (I2):** `useRevenueFilters` traía un `as RevenueRangePreset` que no
+  hacía falta (TypeScript ya estrecha el tipo tras el chequeo de `"custom"`) y que además
+  desactivaba el único chequeo en tiempo de compilación que mantiene sincronizados
+  `REVENUE_RANGE_PRESETS` y `REVENUE_FILTER_PRESETS` — los dos arrays duplicados a propósito
+  por la restricción de `node --test`. Sin el cast, agregar un preset a uno sin el otro ahora
+  es un error de compilación, no un 400 silencioso en producción.
+- **Importante, corregido (I3):** `revenueQuerySchema` no tenía tope de tamaño de rango; un
+  `from`/`to` de siglos de diferencia —alcanzable a mano por la URL del rango libre por
+  cualquier rol con `finance.read`, no solo admins— hacía que `fillMissingDaysInRange` intentara
+  generar millones de puntos. Se agregó un tope de 1826 días (~5 años).
+- **Diferido (Minor, decisión del usuario):** `modules/finance/types/finance.ts` (Fase 1)
+  todavía importa `computeMargin` vía alias `@/modules/finance/utils` en vez de un import
+  relativo — hoy no rompe nada porque ningún test lo carga directo, pero es la misma trampa que
+  `types/revenue.ts` demostró en esta fase. Un fix de una línea, no aplicado en este cierre.
+- Otros hallazgos Minor (columna de margen sin límite superior de categorías visibles,
+  `to` con precisión de milisegundos rompiendo la caché de TanStack Query en cada visita, el
+  ícono `%` etiquetando un monto en vez de un porcentaje, etc.) quedan diferidos; ver el
+  mensaje de cierre de la sesión para la lista completa.
+
+Verificación final tras los fixes: `npm run typecheck && npm run lint && npm run build && npm test` — 197/197.
 
 ## Notas
 - `getRevenueByCategory` no pagina: el número de categorías del catálogo es chico y acotado por el propio negocio, a diferencia de listados de productos o pedidos.

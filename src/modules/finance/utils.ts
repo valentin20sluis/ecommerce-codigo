@@ -53,7 +53,11 @@ function toDayKey(date: Date): string {
 /**
  * Zero-fill para un rango libre (016 D5): variante de `fillMissingDays` del
  * dashboard (013), que solo aceptaba 7/30/90 días fijos. Aquí el número de
- * días sale de `from`/`to`, calculado en UTC para no correrse un día.
+ * días sale de `from`/`to`, truncados a su día calendario en **UTC** — la
+ * misma zona en la que `getDailySales` agrupa en Postgres. `from`/`to` deben
+ * llegar ya construidos en UTC (ver `resolveDateRangePreset`, revisión final
+ * 016 I1): si llegan en hora local, esta función y la consulta SQL usarían
+ * relojes distintos y el resultado se corre hasta 24 h.
  */
 export function fillMissingDaysInRange(
   from: Date,
@@ -79,12 +83,28 @@ export const REVENUE_RANGE_PRESETS = ["this_month", "last_month", "this_quarter"
 export type RevenueRangePreset = (typeof REVENUE_RANGE_PRESETS)[number];
 
 /**
- * Traduce un preset de negocio a fechas concretas en hora **local** (016 D3),
- * mismo criterio que `currentMonthRange()` en `orders/hooks/use-my-orders.ts`.
+ * Traduce un preset de negocio a fechas concretas (revisión final 016, I1).
+ * Qué mes/trimestre/año "es" se decide con el calendario **local** de quien
+ * usa el panel (`now.getFullYear()`/`getMonth()`, mismo criterio que
+ * `currentMonthRange()` en `orders/hooks/use-my-orders.ts`), pero el límite
+ * en sí se construye con `Date.UTC(...)`, no con el constructor local: este
+ * valor viaja hasta `fillMissingDaysInRange` (que lee `getUTCFullYear`/
+ * `getUTCMonth`/`getUTCDate`) y hasta `getDailySales`, que agrupa en
+ * Postgres con `at time zone 'utc'` — si el límite se construye en hora
+ * local, ambos lados quedan corridos hasta 24 h para cualquier operador que
+ * no esté en UTC+0 (día fantasma al final de la gráfica de tendencia).
+ *
+ * `last_month` termina en el **último instante** del mes anterior
+ * (`Date.UTC(year, month, 1) - 1`), no en el inicio exclusivo del mes
+ * actual: con el inicio exclusivo, `fillMissingDaysInRange` —que trata sus
+ * dos extremos como inclusivos— contaba un día de más (29 para febrero).
+ * De paso, esto cierra el hueco por el que una orden exactamente en el
+ * instante de corte podía contarse en dos meses a la vez.
+ *
  * Los presets "en curso" (`this_month`/`this_quarter`/`this_year`) llegan
- * hasta `now`; `last_month` es un período cerrado completo. `now` es
- * inyectable para pruebas deterministas, mismo patrón que `isExpired` en
- * `payment-methods/constants.ts`.
+ * hasta `now` tal cual: es un instante real, no un límite de día que deba
+ * alinearse con UTC. `now` es inyectable para pruebas deterministas, mismo
+ * patrón que `isExpired` en `payment-methods/constants.ts`.
  */
 export function resolveDateRangePreset(
   preset: RevenueRangePreset,
@@ -95,17 +115,20 @@ export function resolveDateRangePreset(
 
   switch (preset) {
     case "this_month":
-      return { from: new Date(year, month, 1).toISOString(), to: now.toISOString() };
+      return { from: new Date(Date.UTC(year, month, 1)).toISOString(), to: now.toISOString() };
     case "last_month":
       return {
-        from: new Date(year, month - 1, 1).toISOString(),
-        to: new Date(year, month, 1).toISOString(),
+        from: new Date(Date.UTC(year, month - 1, 1)).toISOString(),
+        to: new Date(Date.UTC(year, month, 1) - 1).toISOString(),
       };
     case "this_quarter": {
       const quarterStartMonth = Math.floor(month / 3) * 3;
-      return { from: new Date(year, quarterStartMonth, 1).toISOString(), to: now.toISOString() };
+      return {
+        from: new Date(Date.UTC(year, quarterStartMonth, 1)).toISOString(),
+        to: now.toISOString(),
+      };
     }
     case "this_year":
-      return { from: new Date(year, 0, 1).toISOString(), to: now.toISOString() };
+      return { from: new Date(Date.UTC(year, 0, 1)).toISOString(), to: now.toISOString() };
   }
 }

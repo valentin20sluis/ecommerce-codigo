@@ -90,11 +90,11 @@ describe("fillMissingDaysInRange", () => {
 });
 
 describe("resolveDateRangePreset", () => {
-  it("resolves 'this_month' from day 1 (local) to now", () => {
+  it("resolves 'this_month' from day 1 (UTC) to now", () => {
     const now = new Date(2026, 2, 15, 10, 30);
 
     assert.deepEqual(resolveDateRangePreset("this_month", now), {
-      from: new Date(2026, 2, 1).toISOString(),
+      from: new Date(Date.UTC(2026, 2, 1)).toISOString(),
       to: now.toISOString(),
     });
   });
@@ -103,8 +103,8 @@ describe("resolveDateRangePreset", () => {
     const now = new Date(2026, 2, 15);
 
     assert.deepEqual(resolveDateRangePreset("last_month", now), {
-      from: new Date(2026, 1, 1).toISOString(),
-      to: new Date(2026, 2, 1).toISOString(),
+      from: new Date(Date.UTC(2026, 1, 1)).toISOString(),
+      to: new Date(Date.UTC(2026, 2, 1) - 1).toISOString(),
     });
   });
 
@@ -112,16 +112,30 @@ describe("resolveDateRangePreset", () => {
     const now = new Date(2026, 0, 20);
 
     assert.deepEqual(resolveDateRangePreset("last_month", now), {
-      from: new Date(2025, 11, 1).toISOString(),
-      to: new Date(2026, 0, 1).toISOString(),
+      from: new Date(Date.UTC(2025, 11, 1)).toISOString(),
+      to: new Date(Date.UTC(2026, 0, 1) - 1).toISOString(),
     });
+  });
+
+  it("resolves 'last_month' to exactly the days in that month, not one extra (final review I1)", () => {
+    // Febrero 2026 no es bisiesto: 28 días. Antes del fix daba 29 (arrastraba
+    // el primer día de marzo porque `to` era el inicio exclusivo del mes
+    // siguiente, no el último instante del mes anterior).
+    const now = new Date(2026, 2, 10);
+    const range = resolveDateRangePreset("last_month", now);
+
+    const points = fillMissingDaysInRange(new Date(range.from), new Date(range.to), []);
+
+    assert.equal(points.length, 28);
+    assert.equal(points[0].date, "2026-02-01");
+    assert.equal(points[27].date, "2026-02-28");
   });
 
   it("resolves 'this_quarter' to the start of the current quarter", () => {
     const now = new Date(2026, 7, 10);
 
     assert.deepEqual(resolveDateRangePreset("this_quarter", now), {
-      from: new Date(2026, 6, 1).toISOString(),
+      from: new Date(Date.UTC(2026, 6, 1)).toISOString(),
       to: now.toISOString(),
     });
   });
@@ -130,7 +144,7 @@ describe("resolveDateRangePreset", () => {
     const now = new Date(2026, 10, 1);
 
     assert.deepEqual(resolveDateRangePreset("this_year", now), {
-      from: new Date(2026, 0, 1).toISOString(),
+      from: new Date(Date.UTC(2026, 0, 1)).toISOString(),
       to: now.toISOString(),
     });
   });

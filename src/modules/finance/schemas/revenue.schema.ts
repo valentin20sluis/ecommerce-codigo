@@ -1,6 +1,16 @@
 import { z } from "zod";
 
 /**
+ * Tope de cordura (revisión final 016, I3): sin él, un rango tipo
+ * `from=0001-01-01&to=9999-12-31` pasa la validación de formato y hace que
+ * `fillMissingDaysInRange` intente asignar millones de puntos — cualquier
+ * usuario con `finance.read` (no solo admins: también `manager`/`audit`)
+ * puede mandarlo a mano por la URL del rango libre. 5 años es generoso para
+ * un reporte financiero.
+ */
+const MAX_RANGE_DAYS = 1826;
+
+/**
  * Entrada de `GET /api/admin/finance/revenue`. Ambos campos son requeridos a
  * propósito (016 D3): un reporte financiero nunca corre con un rango
  * implícito. El cliente siempre resuelve el preset a fechas concretas antes
@@ -12,11 +22,24 @@ export const revenueQuerySchema = z
     to: z.iso.datetime(),
   })
   .superRefine((values, ctx) => {
-    if (new Date(values.to) < new Date(values.from)) {
+    const from = new Date(values.from);
+    const to = new Date(values.to);
+
+    if (to < from) {
       ctx.addIssue({
         code: "custom",
         path: ["to"],
         message: "El fin del rango no puede ser anterior al inicio.",
+      });
+      return;
+    }
+
+    const spanDays = (to.getTime() - from.getTime()) / 86_400_000;
+    if (spanDays > MAX_RANGE_DAYS) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["to"],
+        message: `El rango no puede superar ${MAX_RANGE_DAYS} días.`,
       });
     }
   });

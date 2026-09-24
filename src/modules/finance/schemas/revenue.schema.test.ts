@@ -30,6 +30,22 @@ describe("revenueQuerySchema", () => {
       false,
     );
   });
+
+  it("rejects a range spanning more than 5 years (final review I3)", () => {
+    const result = revenueQuerySchema.safeParse({
+      from: "2000-01-01T00:00:00.000Z",
+      to: "2026-01-01T00:00:00.000Z",
+    });
+    assert.equal(result.success, false);
+  });
+
+  it("accepts a range right at the 5-year cap", () => {
+    const result = revenueQuerySchema.safeParse({
+      from: "2021-01-01T00:00:00.000Z",
+      to: "2026-01-01T00:00:00.000Z",
+    });
+    assert.equal(result.success, true);
+  });
 });
 
 describe("revenueFiltersSchema", () => {
