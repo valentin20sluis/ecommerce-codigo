@@ -4,8 +4,10 @@ import { SETTLED_STATUSES } from "@/modules/orders/constants";
 import { db } from "@/server/db";
 import type { Executor, ReadExecutor } from "@/server/db/pool";
 import {
+  categories,
   orderItems,
   orders,
+  products,
   users,
   type NewOrder,
   type NewOrderItem,
@@ -409,4 +411,50 @@ export async function markCanceled(executor: Executor, orderId: string): Promise
     .returning();
 
   return order ?? null;
+}
+
+export type CategoryRevenueRow = {
+  categoryId: string;
+  categoryName: string;
+  /** Ingresos totales de la categoría, tengan o no costo conocido las líneas. */
+  revenueCents: number;
+  units: number;
+  /** Suma de margen solo en líneas con `cost_cents_snapshot` no nulo (016 D2). */
+  marginCentsKnown: number;
+  /** Ingresos de esas mismas líneas — la base para calcular % de cobertura. */
+  revenueCentsKnown: number;
+};
+
+/**
+ * Desglose por categoría del reporte de Ingresos (016). `revenueCents`/`units`
+ * cuentan el 100% de las líneas del rango; `marginCentsKnown`/`revenueCentsKnown`
+ * solo las que tienen costo congelado, con `filter (where ...)` en la misma
+ * agregación — mismo estilo que `getFacetCounts` en `product.repository.ts`,
+ * sin una segunda consulta ni una lectura por fila.
+ */
+export async function getRevenueByCategory(
+  from: Date,
+  to: Date,
+  executor: ReadExecutor = db,
+): Promise<CategoryRevenueRow[]> {
+  const revenueExpr = sql<number>`${orderItems.unitPriceCents} * ${orderItems.qty}`;
+  const marginExpr = sql<number>`(${orderItems.unitPriceCents} - ${orderItems.costCentsSnapshot}) * ${orderItems.qty}`;
+  const hasCost = sql`${orderItems.costCentsSnapshot} is not null`;
+
+  return executor
+    .select({
+      categoryId: categories.id,
+      categoryName: categories.name,
+      revenueCents: sql<number>`coalesce(sum(${revenueExpr}), 0)::int`,
+      units: sql<number>`coalesce(sum(${orderItems.qty}), 0)::int`,
+      marginCentsKnown: sql<number>`coalesce(sum(${marginExpr}) filter (where ${hasCost}), 0)::int`,
+      revenueCentsKnown: sql<number>`coalesce(sum(${revenueExpr}) filter (where ${hasCost}), 0)::int`,
+    })
+    .from(orderItems)
+    .innerJoin(orders, eq(orders.id, orderItems.orderId))
+    .innerJoin(products, eq(products.id, orderItems.productId))
+    .innerJoin(categories, eq(categories.id, products.categoryId))
+    .where(settledInRange(from, to))
+    .groupBy(categories.id, categories.name)
+    .orderBy(desc(sql`sum(${revenueExpr})`));
 }
