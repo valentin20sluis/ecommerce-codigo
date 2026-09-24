@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { href: "/admin/products", label: "Productos" },
   { href: "/admin/inventory", label: "Inventario" },
   { href: "/admin/finance/unit-price", label: "Finanzas" },
+  { href: "/admin/finance/revenue", label: "Ingresos" },
   { href: "/admin/orders", label: "Pedidos" },
   { href: "/admin/roles", label: "Roles y accesos" },
   { href: "/admin/audit-logs", label: "Bitácora" },
