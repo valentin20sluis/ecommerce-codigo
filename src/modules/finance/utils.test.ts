@@ -4,9 +4,28 @@ import { describe, it } from "node:test";
 import {
   computeMargin,
   fillMissingDaysInRange,
+  parseAmountToCents,
   resolveDateRangePreset,
   resolveMarginCoverage,
 } from "./utils.ts";
+
+describe("parseAmountToCents", () => {
+  it("converts a dot decimal to integer cents", () => {
+    assert.equal(parseAmountToCents("19.99"), 1999);
+  });
+
+  it("converts a comma decimal to integer cents", () => {
+    assert.equal(parseAmountToCents("19,99"), 1999);
+  });
+
+  it("rounds away floating point noise", () => {
+    assert.equal(parseAmountToCents("0.1"), 10);
+  });
+
+  it("returns NaN for text that is not a number", () => {
+    assert.ok(Number.isNaN(parseAmountToCents("abc")));
+  });
+});
 
 describe("computeMargin", () => {
   it("returns null margin when there is no cost loaded", () => {

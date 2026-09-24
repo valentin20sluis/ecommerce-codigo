@@ -132,3 +132,13 @@ export function resolveDateRangePreset(
       return { from: new Date(Date.UTC(year, 0, 1)).toISOString(), to: now.toISOString() };
   }
 }
+
+/**
+ * "19.99" → 1999, misma fórmula que `toCents` de `@/lib/utils`, reimplementada
+ * aquí porque los schemas de formulario corren bajo `node --test`, que no
+ * resuelve imports de valor por alias `@/`. Devuelve `NaN` si no es número.
+ */
+export function parseAmountToCents(value: string): number {
+  const parsed = Number.parseFloat(value.replace(",", "."));
+  return Number.isFinite(parsed) ? Math.round(parsed * 100) : Number.NaN;
+}
