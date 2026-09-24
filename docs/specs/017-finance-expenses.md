@@ -1,7 +1,7 @@
 ---
 id: 017
 title: Finanzas — Fase 3: Egresos (gastos operativos + plantillas recurrentes)
-status: draft
+status: done
 module: finance
 scope: admin
 ---
@@ -111,20 +111,41 @@ Estados de carga, error con reintento y vacío en ambas pestañas. Nav "Egresos"
 - `src/modules/finance/utils.ts`: funciones puras de fechas del reporte (UTC).
 
 ## Criterios de aceptación
-- [ ] AC1 — Dado un alta válida, cuando se hace POST, entonces se crea el egreso y se escribe `expense.created` en `audit_logs` en la misma transacción.
-- [ ] AC2 — Dado `amountCents` ≤ 0 o mayor que `MAX_EXPENSE_CENTS`, entonces responde 400 (nunca 500).
-- [ ] AC3 — Dado un DELETE de egreso, entonces la fila desaparece y `audit_logs` guarda la foto completa previa.
-- [ ] AC4 — Dado un usuario con `finance.read` sin `finance.manage_expenses`, entonces POST/PATCH/DELETE responden 403 y la UI no muestra las acciones de escritura.
-- [ ] AC5 — Dado un GET con `to < from` o rango > 1826 días, entonces responde 400.
-- [ ] AC6 — Dado un GET con filtros, entonces `totalCents` suma todos los egresos del filtro, no solo los de la página.
-- [ ] AC7 — Dada una plantilla activa con `day_of_month = 31` y `starts_on` hace 3 meses, cuando se consulta el listado, entonces se generan exactamente los vencimientos ≤ hoy, y en febrero cae el día 28/29.
-- [ ] AC8 — Dada la generación ejecutada dos veces seguidas (o en paralelo), entonces no se duplica ningún vencimiento.
-- [ ] AC9 — Dado un egreso generado que se borra, cuando se vuelve a consultar, entonces no reaparece.
-- [ ] AC10 — Dada una plantilla editada (nuevo monto), entonces los egresos ya generados conservan el monto original y los nuevos vencimientos usan el nuevo.
-- [ ] AC11 — Dada una plantilla pausada y luego reactivada, entonces no se generan vencimientos del período en pausa.
-- [ ] AC12 — Dado `starts_on` anterior a hoy − 1826 días, entonces la API responde 400.
-- [ ] AC13 — Dado un usuario sin `finance.read`, entonces la API responde 403 y `/admin/finance/expenses` redirige a `/admin`.
+- [ ] AC1 — Dado un alta válida, cuando se hace POST, entonces se crea el egreso y se escribe `expense.created` en `audit_logs` en la misma transacción. **No observado en ejecución** (revisión final 015 I3): implementado y tipado, pero ningún test ni script lo corrió; queda por construcción.
+- [x] AC2 — Dado `amountCents` ≤ 0 o mayor que `MAX_EXPENSE_CENTS`, entonces responde 400 (nunca 500).
+- [ ] AC3 — Dado un DELETE de egreso, entonces la fila desaparece y `audit_logs` guarda la foto completa previa. **No observado en ejecución** (revisión final 015 I3): implementado y tipado, pero ningún test ni script lo corrió; queda por construcción.
+- [ ] AC4 — Dado un usuario con `finance.read` sin `finance.manage_expenses`, entonces POST/PATCH/DELETE responden 403 y la UI no muestra las acciones de escritura. **No observado con sesión real de navegador**: `requirePermission`/`can()` son las mismas funciones ya usadas por inventario e ingresos.
+- [x] AC5 — Dado un GET con `to < from` o rango > 1826 días, entonces responde 400.
+- [ ] AC6 — Dado un GET con filtros, entonces `totalCents` suma todos los egresos del filtro, no solo los de la página. **No observado en ejecución** (revisión final 015 I3): implementado y tipado, pero ningún test ni script lo corrió; queda por construcción.
+- [x] AC7 — Dada una plantilla activa con `day_of_month = 31` y `starts_on` hace 3 meses, cuando se consulta el listado, entonces se generan exactamente los vencimientos ≤ hoy, y en febrero cae el día 28/29.
+- [x] AC8 — Dada la generación ejecutada dos veces seguidas (o en paralelo), entonces no se duplica ningún vencimiento.
+- [x] AC9 — Dado un egreso generado que se borra, cuando se vuelve a consultar, entonces no reaparece.
+- [ ] AC10 — Dada una plantilla editada (nuevo monto), entonces los egresos ya generados conservan el monto original y los nuevos vencimientos usan el nuevo. **No observado en ejecución** (revisión final 015 I3): implementado y tipado, pero ningún test ni script lo corrió; queda por construcción.
+- [x] AC11 — Dada una plantilla pausada y luego reactivada, entonces no se generan vencimientos del período en pausa.
+- [ ] AC12 — Dado `starts_on` anterior a hoy − 1826 días, entonces la API responde 400. **No observado en ejecución** (revisión final 015 I3): implementado y tipado, pero ningún test ni script lo corrió; queda por construcción.
+- [ ] AC13 — Dado un usuario sin `finance.read`, entonces la API responde 403 y `/admin/finance/expenses` redirige a `/admin`. **No observado con sesión real de navegador**, mismo motivo que AC4.
 
 ## Notas
 - La generación en un GET tiene efecto secundario a propósito (D5): es idempotente, acotada (≤ 60 filas por plantilla) y evita infraestructura de cron que hoy no existe. Si algún día se despliega con cron, `ensureRecurringExpenses` se puede invocar también desde ahí sin cambios.
 - `incurred_on` es `date`: los rangos del listado se comparan por día UTC, coherente con `getDailySales` (013/016).
+
+## Notas de implementación (017, cierre)
+
+- Calca los patrones de inventario (`stock-adjust-dialog`, filtros en URL), de ingresos
+  (`RevenueRangePicker`, `resolveDateRangePreset`) y de productos (servicio con `diffChanges` y
+  auditoría en la misma transacción). Sin componentes shadcn nuevos.
+- **Fase 5 (Ganancias) queda obligada** a llamar a `ensureRecurringExpenses()` antes de leer
+  egresos (D12): hoy lo hacen `listExpenses` y `listRecurringExpenses`; un lector que consulte
+  `expenses` directo omitiría los meses aún no materializados.
+- La generación se verificó **contra la BD real** con un script temporal (ya borrado): 3
+  vencimientos generados para una plantilla de día 31 iniciada hace 3 meses, segunda ejecución
+  sin duplicar, 3 ejecuciones **en paralelo** sin duplicar, un egreso borrado no reaparece, y
+  reactivar una plantilla pausada no genera retroactivo (AC7, AC8, AC9, AC11).
+- AC1, AC3, AC6, AC10 y AC12 (auditoría transaccional, `totalCents`, no tocar lo ya generado,
+  tope de `starts_on`) están implementados y tipados pero **no se ejecutaron**; AC4 y AC13 requieren
+  una sesión real de navegador. Verificación pendiente del usuario en `/admin/finance/expenses`:
+  crear/editar/borrar un egreso, crear una plantilla con inicio pasado y ver el aviso de meses
+  atrasados, y confirmar que un `manager` no ve las acciones de escritura.
+- Migración `0011` aplicada a Neon junto con `db:seed` (27 permisos), con confirmación del usuario.
+
+Verificación final: `npm run typecheck && npm run lint && npm run build && npm test` — 261/261.
