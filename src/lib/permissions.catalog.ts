@@ -20,6 +20,7 @@ export const PERMISSIONS = {
   INVENTORY_ADJUST: "inventory.adjust",
   FINANCE_READ: "finance.read",
   FINANCE_MANAGE_COSTS: "finance.manage_costs",
+  FINANCE_MANAGE_EXPENSES: "finance.manage_expenses",
   ROLES_READ: "roles.read",
   ROLES_CREATE: "roles.create",
   ROLES_UPDATE: "roles.update",
@@ -55,6 +56,8 @@ const PERMISSION_DESCRIPTIONS: Record<PermissionCode, string> = {
   [PERMISSIONS.INVENTORY_ADJUST]: "Registrar ajustes, mermas y reposiciones de stock.",
   [PERMISSIONS.FINANCE_READ]: "Ver costo, margen y reportes financieros.",
   [PERMISSIONS.FINANCE_MANAGE_COSTS]: "Editar el costo unitario de un producto.",
+  [PERMISSIONS.FINANCE_MANAGE_EXPENSES]:
+    "Crear, editar y borrar egresos y plantillas de egresos recurrentes.",
   [PERMISSIONS.ROLES_READ]: "Ver roles y sus permisos.",
   [PERMISSIONS.ROLES_CREATE]: "Crear roles.",
   [PERMISSIONS.ROLES_UPDATE]: "Editar el nombre y la descripción de un rol.",
