@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { href: "/admin/inventory", label: "Inventario" },
   { href: "/admin/finance/unit-price", label: "Finanzas" },
   { href: "/admin/finance/revenue", label: "Ingresos" },
+  { href: "/admin/finance/expenses", label: "Egresos" },
   { href: "/admin/orders", label: "Pedidos" },
   { href: "/admin/roles", label: "Roles y accesos" },
   { href: "/admin/audit-logs", label: "Bitácora" },
