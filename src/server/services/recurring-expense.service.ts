@@ -38,8 +38,8 @@ async function requireTemplate(tx: ReadExecutor, id: string): Promise<RecurringE
 
 /**
  * Materializa los vencimientos pendientes de las plantillas activas (017 D5).
- * Idempotente y segura en concurrencia: bloquea las plantillas con `FOR UPDATE
- * SKIP LOCKED`, inserta con `ON CONFLICT DO NOTHING` y avanza la marca
+ * Idempotente y segura en concurrencia: bloquea las plantillas con `FOR UPDATE`
+ * (las peticiones concurrentes esperan y releen la marca), inserta con `ON CONFLICT DO NOTHING` y avanza la marca
  * `generated_through` — por eso un egreso generado que se borra no reaparece
  * (D6). Es una acción del sistema: `actor_id` nulo y sin exigir
  * `finance.manage_expenses`, así que la puede disparar un lector con

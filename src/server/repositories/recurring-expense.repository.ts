@@ -82,15 +82,16 @@ export async function remove(executor: Executor, id: string): Promise<void> {
 
 /**
  * Bloquea las plantillas activas dentro de la transacción de la generación
- * (017 D6). `SKIP LOCKED`: si otra petición ya las está generando, esta las
- * salta en vez de esperar — esa otra petición materializa sus vencimientos.
+ * (017 D6). `FOR UPDATE` sin `SKIP LOCKED`: si otra petición ya las está
+ * generando, esta espera a que confirme y relee la marca ya avanzada. Saltarlas
+ * dejaba al lector con filas aún sin confirmar y subreportaba egresos.
  */
 export async function lockActive(executor: Executor): Promise<RecurringExpense[]> {
   return executor
     .select()
     .from(recurringExpenses)
     .where(eq(recurringExpenses.isActive, true))
-    .for("update", { skipLocked: true });
+    .for("update");
 }
 
 export async function setGeneratedThrough(
