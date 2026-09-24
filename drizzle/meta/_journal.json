@@ -78,6 +78,13 @@
       "when": 1790043476533,
       "tag": "0010_worried_tarantula",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790217425884,
+      "tag": "0011_aspiring_thunderball",
+      "breakpoints": true
     }
   ]
 }
