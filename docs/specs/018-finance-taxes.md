@@ -1,7 +1,7 @@
 ---
 id: 018
 title: Finanzas — Fase 4: Impuestos (IGV de ventas + renta estimada)
-status: in-review
+status: done
 module: finance
 scope: admin
 ---
@@ -120,3 +120,10 @@ Verificación final: `npm run typecheck && npm run lint && npm test` y `Grep -i 
 - `orders.total_cents` = suma de líneas (sin envío); con envío, la base debería calcularse sobre el total del pedido.
 - La renta estimada ignora egresos no deducibles: orden de magnitud, no liquidación.
 - La migración `0012` (y el seed con `finance.manage_taxes`) se aplicó a Neon el 2026-09-24; la enmienda no la regenera.
+
+## Cierre (018)
+
+Cerrado a pedido del humano el 2026-09-24, con typecheck, lint, build y 353 tests en verde y aprobado
+por el reviewer. Los AC que siguen sin marcar (AC3, AC6–AC15) están implementados y trazados en código,
+pero nadie los observó en ejecución (API real, BD o sesiones con y sin permiso); quedan así a propósito.
+Migración `0012` y seed (`finance.manage_taxes`) aplicados a Neon el 2026-09-24.

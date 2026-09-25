@@ -1,7 +1,7 @@
 ---
 id: 021
 title: Finanzas — Fase 6, entrega 1: Contabilidad (libro diario, solo lectura)
-status: in-review
+status: done
 module: finance
 scope: admin
 ---
@@ -101,3 +101,11 @@ Verificación final: `npm run typecheck && npm run lint && npm test` (el `build`
 - `getRevenueByCategory` suma en `::int` por categoría (016); si un mes lo desborda, pasarlo a `float8` afecta también a 016/018.
 - Los totales del mes vienen de agregados (D10), no de sumar páginas; el cuadre por asiento lo garantizan y prueban T1/T2.
 - `splitGross(gross del mes)` y la suma de los `splitGross` por pedido pueden diferir en céntimos por redondeo; D10 usa el del mes para coincidir con 018 (AC10). Se muestra así y se rotula.
+
+## Cierre (021)
+
+Cerrado a pedido del humano el 2026-09-24, con typecheck, lint, build y 353 tests en verde y aprobado
+por el reviewer. Los AC que siguen sin marcar (AC7–AC16) están implementados y trazados en código, pero
+nadie los observó en ejecución (Postgres real con más de 50 asientos, egresos mezclados con ventas,
+sesiones con y sin permiso); quedan así a propósito. La tarjeta «Cómo leer el libro diario» (T13) se
+retiró a pedido del humano tras ver la pantalla.

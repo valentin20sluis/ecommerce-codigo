@@ -1,7 +1,7 @@
 ---
 id: 020
 title: Finanzas — Fase 5: Ganancias (estado de resultados mensual)
-status: in-review
+status: done
 module: finance
 scope: admin
 ---
@@ -92,3 +92,9 @@ Marcar `[x]` solo en AC observados (tests en verde o prueba manual real).
 - La página no lee datos en servidor (nota de 019: layout y página corren en paralelo); solo `ProfitManager` vía API con `requirePermission`.
 - La cobertura compara ingresos brutos con costo conocido vs. brutos totales (misma base que 018); el aviso es cualitativo.
 - El brief pedía `profits/page.tsx`, pero `sections.ts` usa `profit`: se sigue `sections.ts` para no tocar el `href` (D3).
+
+## Cierre (020)
+
+Cerrado a pedido del humano el 2026-09-24, con typecheck, lint, build y 353 tests en verde y aprobado
+por el reviewer. Los AC que siguen sin marcar (AC4–AC13) están implementados y trazados en código, pero
+nadie los observó en ejecución (API real, BD o sesiones con y sin permiso); quedan así a propósito.
