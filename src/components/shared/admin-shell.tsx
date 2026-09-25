@@ -1,14 +1,13 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
+
+import { AdminNavLink } from "@/components/shared/admin-nav-link";
 
 const NAV_ITEMS = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/categories", label: "Categorías" },
   { href: "/admin/products", label: "Productos" },
   { href: "/admin/inventory", label: "Inventario" },
-  { href: "/admin/finance/unit-price", label: "Finanzas" },
-  { href: "/admin/finance/revenue", label: "Ingresos" },
-  { href: "/admin/finance/expenses", label: "Egresos" },
+  { href: "/admin/finance", label: "Finanzas" },
   { href: "/admin/orders", label: "Pedidos" },
   { href: "/admin/roles", label: "Roles y accesos" },
   { href: "/admin/audit-logs", label: "Bitácora" },
@@ -24,13 +23,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         </p>
         <nav className="flex flex-col gap-1">
           {NAV_ITEMS.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="hover:bg-muted rounded-md px-3 py-2 text-sm transition-colors"
-            >
-              {item.label}
-            </Link>
+            <AdminNavLink key={item.href} href={item.href} label={item.label} />
           ))}
         </nav>
       </aside>
