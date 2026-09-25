@@ -322,9 +322,10 @@ export async function updateStatus(
 
 /**
  * Ventana de las métricas (013 D1/D2): solo órdenes cobradas, `created_at` entre
- * `from` y `to`. Una sola definición del filtro para las tres agregaciones.
+ * `from` y `to`. Una sola definición del filtro para las agregaciones y el
+ * libro diario (021).
  */
-function settledInRange(from: Date, to: Date): SQL {
+export function settledInRange(from: Date, to: Date): SQL {
   return and(
     inArray(orders.status, [...SETTLED_STATUSES]),
     gte(orders.createdAt, from),
@@ -479,4 +480,29 @@ export async function getRevenueByCategory(
     .where(settledInRange(from, to))
     .groupBy(categories.id, categories.name)
     .orderBy(desc(sql`sum(${revenueExpr})`));
+}
+
+export type OrderKnownCostRow = { orderId: string; knownCostCents: number };
+
+/**
+ * Costo conocido por pedido para una página del libro diario (021 D6): una sola
+ * consulta agrupada para todos los ids, sin N+1. Solo cuentan las líneas con
+ * costo congelado; un pedido sin ninguna devuelve 0. Suma en `float8` (015/016).
+ */
+export async function sumKnownCostByOrderIds(
+  orderIds: string[],
+  executor: ReadExecutor = db,
+): Promise<OrderKnownCostRow[]> {
+  if (orderIds.length === 0) return [];
+
+  const costExpr = sql<number>`${orderItems.costCentsSnapshot} * ${orderItems.qty}`;
+
+  return executor
+    .select({
+      orderId: orderItems.orderId,
+      knownCostCents: sql<number>`coalesce(sum(${costExpr}) filter (where ${orderItems.costCentsSnapshot} is not null), 0)::float8`,
+    })
+    .from(orderItems)
+    .where(inArray(orderItems.orderId, orderIds))
+    .groupBy(orderItems.orderId);
 }
