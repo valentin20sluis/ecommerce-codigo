@@ -373,6 +373,28 @@ export async function getDailySales(
     .orderBy(day);
 }
 
+export type MonthlySalesPoint = { month: string; salesCents: number };
+
+/**
+ * Ventas cobradas por mes UTC (018 D4), misma zona que `getDailySales`. Suma en
+ * `float8` y no `int`: el total de un mes puede pasar el rango de 32 bits
+ * (lección de 015/016). Solo devuelve meses con ventas; el zero-fill es del service.
+ */
+export async function getMonthlySales(
+  from: Date,
+  to: Date,
+  executor: ReadExecutor = db,
+): Promise<MonthlySalesPoint[]> {
+  const month = sql<string>`to_char(date_trunc('month', ${orders.createdAt} at time zone 'utc'), 'YYYY-MM')`;
+
+  return executor
+    .select({ month, salesCents: sql<number>`coalesce(sum(${orders.totalCents}), 0)::float8` })
+    .from(orders)
+    .where(settledInRange(from, to))
+    .groupBy(month)
+    .orderBy(month);
+}
+
 export type TopProductRow = { productId: string; name: string; units: number };
 
 /**

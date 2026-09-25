@@ -5,7 +5,7 @@ export const FINANCE_SECTIONS = [
   { slug: "unit-price", label: "Precio unitario", href: "/admin/finance/unit-price", status: "available" },
   { slug: "revenue", label: "Ingresos", href: "/admin/finance/revenue", status: "available" },
   { slug: "expenses", label: "Egresos", href: "/admin/finance/expenses", status: "available" },
-  { slug: "taxes", label: "Impuestos", href: "/admin/finance/taxes", status: "soon" },
+  { slug: "taxes", label: "Impuestos", href: "/admin/finance/taxes", status: "available" },
   { slug: "profit", label: "Ganancias", href: "/admin/finance/profit", status: "soon" },
   { slug: "accounting", label: "Contabilidad", href: "/admin/finance/accounting", status: "soon" },
 ] as const satisfies readonly {

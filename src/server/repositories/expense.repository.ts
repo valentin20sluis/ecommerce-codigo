@@ -86,6 +86,20 @@ export async function listPaginated(
   return { data, total: totals?.total ?? 0, totalCents: totals?.totalCents ?? 0 };
 }
 
+/** Total de egresos entre dos días (`YYYY-MM-DD`, inclusive), en `float8` por la misma razón que `listPaginated`. */
+export async function sumAmountBetween(
+  from: string,
+  to: string,
+  executor: ReadExecutor = db,
+): Promise<number> {
+  const [row] = await executor
+    .select({ totalCents: sql<number>`coalesce(sum(${expenses.amountCents}), 0)::float8` })
+    .from(expenses)
+    .where(and(gte(expenses.incurredOn, from), lte(expenses.incurredOn, to)));
+
+  return row?.totalCents ?? 0;
+}
+
 /**
  * Inserta los vencimientos de una plantilla ignorando los que ya existan: el
  * índice único parcial `(recurring_expense_id, incurred_on)` es el candado

@@ -2,6 +2,7 @@ export * from "./audit-log";
 export * from "./category";
 export * from "./expense";
 export * from "./expense-category";
+export * from "./finance-settings";
 export * from "./order";
 export * from "./order-item";
 export * from "./payment-method";

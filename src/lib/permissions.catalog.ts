@@ -21,6 +21,7 @@ export const PERMISSIONS = {
   FINANCE_READ: "finance.read",
   FINANCE_MANAGE_COSTS: "finance.manage_costs",
   FINANCE_MANAGE_EXPENSES: "finance.manage_expenses",
+  FINANCE_MANAGE_TAXES: "finance.manage_taxes",
   ROLES_READ: "roles.read",
   ROLES_CREATE: "roles.create",
   ROLES_UPDATE: "roles.update",
@@ -58,6 +59,7 @@ const PERMISSION_DESCRIPTIONS: Record<PermissionCode, string> = {
   [PERMISSIONS.FINANCE_MANAGE_COSTS]: "Editar el costo unitario de un producto.",
   [PERMISSIONS.FINANCE_MANAGE_EXPENSES]:
     "Crear, editar y borrar egresos y plantillas de egresos recurrentes.",
+  [PERMISSIONS.FINANCE_MANAGE_TAXES]: "Cambiar la tasa de impuesto a la renta usada en la estimación.",
   [PERMISSIONS.ROLES_READ]: "Ver roles y sus permisos.",
   [PERMISSIONS.ROLES_CREATE]: "Crear roles.",
   [PERMISSIONS.ROLES_UPDATE]: "Editar el nombre y la descripción de un rol.",
